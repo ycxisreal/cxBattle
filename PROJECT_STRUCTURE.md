@@ -3,7 +3,7 @@
 
 ## 目录结构
 ```
-demo/
+cxBattle/
   electron/
     main.js
     preload.cjs

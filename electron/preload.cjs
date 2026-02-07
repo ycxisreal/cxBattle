@@ -8,7 +8,7 @@ const saveGameData = (payload) => ipcRenderer.invoke('demo:save-data', payload)
 
 contextBridge.exposeInMainWorld('demo', {
   // 获取应用版本
-  version: () => 'demo-1.0.0',
+  version: () => 'cxBattle-1.0.0',
   // 标记为 Electron 环境
   isElectron: true,
   // 获取本地 JSON 数据
