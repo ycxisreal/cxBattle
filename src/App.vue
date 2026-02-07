@@ -1,10 +1,11 @@
 ﻿<script setup>
 import { computed, ref, watchEffect } from "vue";
 import BattleLog from "./components/BattleLog.vue";
+import CustomDataPanel from "./components/CustomDataPanel.vue";
 import SkillCard from "./components/SkillCard.vue";
 import UnitCard from "./components/UnitCard.vue";
 import { useBattle } from "./game/useBattle.js";
-import { strengths, isElectron } from "./game/data/runtimeData.js";
+import { strengths } from "./game/data/runtimeData.js";
 
 const {
   state,
@@ -32,7 +33,6 @@ const sidebarTabs = [
 ];
 const activeSidebarId = ref("skill-formula");
 const showFormulaModal = ref(false);
-const isElectronEnv = isElectron;
 
 const selectedUnit = computed(() =>
   availableUnits.value.find((unit) => unit.id === selectedUnitId.value)
@@ -248,49 +248,7 @@ const closeFormulaModal = () => {
       </aside>
     </section>
 
-    <section v-if="state.phase === 'select'" class="custom-module">
-      <header class="custom-head">
-        <div>
-          <h3>自定义模块</h3>
-          <p>在 Electron 端管理角色、技能与被动数据。</p>
-        </div>
-        <span class="custom-badge" :class="{ disabled: !isElectronEnv }">
-          {{ isElectronEnv ? "Electron 数据源" : "Web 端只读" }}
-        </span>
-      </header>
-      <div class="custom-grid">
-        <div class="custom-card">
-          <h4>角色</h4>
-          <p>新增、编辑与删除角色数据。</p>
-          <div class="custom-actions">
-            <button class="ghost" type="button" :disabled="!isElectronEnv">添加</button>
-            <button class="ghost" type="button" :disabled="!isElectronEnv">编辑</button>
-            <button class="ghost" type="button" :disabled="!isElectronEnv">删除</button>
-          </div>
-        </div>
-        <div class="custom-card">
-          <h4>技能</h4>
-          <p>新增、编辑与删除技能数据。</p>
-          <div class="custom-actions">
-            <button class="ghost" type="button" :disabled="!isElectronEnv">添加</button>
-            <button class="ghost" type="button" :disabled="!isElectronEnv">编辑</button>
-            <button class="ghost" type="button" :disabled="!isElectronEnv">删除</button>
-          </div>
-        </div>
-        <div class="custom-card">
-          <h4>被动</h4>
-          <p>新增、编辑与删除被动数据。</p>
-          <div class="custom-actions">
-            <button class="ghost" type="button" :disabled="!isElectronEnv">添加</button>
-            <button class="ghost" type="button" :disabled="!isElectronEnv">编辑</button>
-            <button class="ghost" type="button" :disabled="!isElectronEnv">删除</button>
-          </div>
-        </div>
-      </div>
-      <p v-if="!isElectronEnv" class="hint">
-        Web 端仅展示静态数据，自定义功能已禁用。
-      </p>
-    </section>
+    <CustomDataPanel v-if="state.phase === 'select'" />
 
     <aside v-if="state.phase === 'battle'" class="battle-sidebar">
       <div class="sidebar-tabs">
@@ -581,8 +539,8 @@ h1 {
 
 .ghost:hover,
 .primary:hover {
-  background: rgba(255, 255, 255, 0.05);
-  transition: background 0.2s;
+  opacity: 0.5;
+  transition: all 0.3s;
 }
 
 .primary {
@@ -797,83 +755,6 @@ h1 {
 
 .select-preview .start {
   align-self: flex-start;
-}
-
-.custom-module {
-  border-radius: 24px;
-  padding: 24px;
-  background: rgba(9, 13, 22, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.custom-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.custom-head h3 {
-  margin: 0 0 6px;
-  font-size: 20px;
-}
-
-.custom-head p {
-  margin: 0;
-  color: var(--text-muted);
-}
-
-.custom-badge {
-  padding: 6px 12px;
-  border-radius: 999px;
-  font-size: 12px;
-  letter-spacing: 0.02em;
-  background: rgba(74, 215, 191, 0.12);
-  border: 1px solid rgba(74, 215, 191, 0.3);
-  color: rgba(203, 255, 246, 0.9);
-}
-
-.custom-badge.disabled {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.2);
-  color: rgba(255, 255, 255, 0.6);
-}
-
-.custom-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
-}
-
-.custom-card {
-  border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.03);
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.custom-card h4 {
-  margin: 0;
-  font-size: 17px;
-}
-
-.custom-card p {
-  margin: 0;
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.65);
-}
-
-.custom-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
 }
 
 .center-panel {

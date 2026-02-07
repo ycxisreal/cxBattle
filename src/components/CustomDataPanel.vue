@@ -49,6 +49,8 @@ const changeValueOptions = [
 
 const dialogVisible = ref(false);
 const selectVisible = ref(false);
+const skillPreviewVisible = ref(false);
+const strengthPreviewVisible = ref(false);
 const dialogMode = ref("add");
 const selectMode = ref("edit");
 const dialogType = ref("units");
@@ -90,10 +92,18 @@ const strengthOptions = computed(() =>
   }))
 );
 
+
 // 重置选择弹窗状态
 const resetSelectState = () => {
   selectedId.value = null;
   selectKey.value += 1;
+};
+
+// 切换类型时预置表单结构，避免空对象渲染报错
+const prepareFormByType = (type) => {
+  if (type === "units") formModel.value = createDefaultUnit();
+  if (type === "skills") formModel.value = createDefaultSkill();
+  if (type === "strengths") formModel.value = createDefaultStrength();
 };
 
 // 获取下一个可用 ID
@@ -101,13 +111,6 @@ const getNextId = (list) => {
   const maxId = list.reduce((max, item) => Math.max(max, Number(item.id) || 0), 0);
   return maxId + 1;
 };
-
-// 创建默认状态
-const createDefaultStatus = () => ({
-  round: 1,
-  powerRate: 1,
-  value: 0,
-});
 
 // 创建默认角色
 const createDefaultUnit = () => ({
@@ -128,14 +131,6 @@ const createDefaultUnit = () => ({
   healPerRound: 0,
   speed: 3,
   randomRate: { low: 0.8, high: 1.2 },
-  weakStatusEnabled: false,
-  weakStatus: createDefaultStatus(),
-  strongStatusEnabled: false,
-  strongStatus: createDefaultStatus(),
-  armorStatusEnabled: false,
-  armorStatus: createDefaultStatus(),
-  damageStatusEnabled: false,
-  damageStatus: createDefaultStatus(),
   stopRound: 0,
   des: "",
 });
@@ -151,7 +146,6 @@ const createDefaultSkill = () => ({
   changeValue: [],
   accuracy: 1,
   criticalRate: 0,
-  hidden: false,
 });
 
 // 创建默认条件
@@ -195,21 +189,22 @@ const createDefaultStrength = () => ({
 
 // 构建角色表单
 const buildUnitForm = (unit) => {
-  const base = cloneData(unit);
+  const base = cloneData(unit) || {};
+  const cleaned = { ...base };
+  delete cleaned.weakStatus;
+  delete cleaned.strongStatus;
+  delete cleaned.armorStatus;
+  delete cleaned.damageStatus;
+  delete cleaned.weakStatusEnabled;
+  delete cleaned.strongStatusEnabled;
+  delete cleaned.armorStatusEnabled;
+  delete cleaned.damageStatusEnabled;
   return {
     ...createDefaultUnit(),
-    ...base,
-    strength: base?.strength || [],
-    skillList: base?.skillList || [],
-    randomRate: base?.randomRate || { low: 0.8, high: 1.2 },
-    weakStatusEnabled: Boolean(base?.weakStatus),
-    weakStatus: base?.weakStatus || createDefaultStatus(),
-    strongStatusEnabled: Boolean(base?.strongStatus),
-    strongStatus: base?.strongStatus || createDefaultStatus(),
-    armorStatusEnabled: Boolean(base?.armorStatus),
-    armorStatus: base?.armorStatus || createDefaultStatus(),
-    damageStatusEnabled: Boolean(base?.damageStatus),
-    damageStatus: base?.damageStatus || createDefaultStatus(),
+    ...cleaned,
+    strength: cleaned?.strength || [],
+    skillList: cleaned?.skillList || [],
+    randomRate: cleaned?.randomRate || { low: 0.8, high: 1.2 },
   };
 };
 
@@ -256,9 +251,7 @@ const openAdd = (type) => {
   editingId.value = null;
   selectVisible.value = false;
   resetSelectState();
-  if (type === "units") formModel.value = createDefaultUnit();
-  if (type === "skills") formModel.value = createDefaultSkill();
-  if (type === "strengths") formModel.value = createDefaultStrength();
+  prepareFormByType(type);
   dialogVisible.value = true;
 };
 
@@ -266,6 +259,7 @@ const openAdd = (type) => {
 const openEdit = (type) => {
   if (!isElectronEnv) return;
   dialogType.value = type;
+  prepareFormByType(type);
   selectMode.value = "edit";
   resetSelectState();
   selectVisible.value = true;
@@ -275,6 +269,7 @@ const openEdit = (type) => {
 const openDelete = (type) => {
   if (!isElectronEnv) return;
   dialogType.value = type;
+  prepareFormByType(type);
   selectMode.value = "delete";
   resetSelectState();
   selectVisible.value = true;
@@ -314,40 +309,45 @@ const normalizeNumberArray = (value) =>
     .map((item) => Number(item))
     .filter((item) => !Number.isNaN(item));
 
-// 标准化状态对象
-const normalizeStatus = (enabled, status) => {
-  if (!enabled) return null;
-  const result = { round: Number(status?.round || 0) };
-  if (status?.powerRate !== undefined && status?.powerRate !== null) {
-    result.powerRate = Number(status.powerRate);
-  }
-  if (status?.value !== undefined && status?.value !== null) {
-    result.value = Number(status.value);
-  }
-  return result;
-};
-
 // 标准化技能/被动的附加状态
 const normalizePutStatus = (list) =>
   (Array.isArray(list) ? list : [])
     .filter((item) => item?.name)
-    .map((item) => ({
-      name: item.name,
-      round: Number(item.round || 0),
-      value: item.value !== undefined && item.value !== null ? Number(item.value) : undefined,
-      rate: item.rate !== undefined && item.rate !== null ? Number(item.rate) : undefined,
-    }));
+    .map((item) => {
+      const hasValue = item.value !== undefined && item.value !== null;
+      const hasRate = item.rate !== undefined && item.rate !== null;
+      return {
+        name: item.name,
+        round: Number(item.round || 0),
+        value: hasValue ? Number(item.value) : undefined,
+        rate:
+          hasValue
+            ? undefined
+            : hasRate
+              ? Number(item.rate)
+              : undefined,
+      };
+    });
 
 // 标准化数值变更
 const normalizeChangeValue = (list) =>
   (Array.isArray(list) ? list : [])
     .filter((item) => item?.name)
-    .map((item) => ({
-      self: Boolean(item.self),
-      name: item.name,
-      value: item.value !== undefined && item.value !== null ? Number(item.value) : undefined,
-      rate: item.rate !== undefined && item.rate !== null ? Number(item.rate) : undefined,
-    }));
+    .map((item) => {
+      const hasValue = item.value !== undefined && item.value !== null;
+      const hasRate = item.rate !== undefined && item.rate !== null;
+      return {
+        self: Boolean(item.self),
+        name: item.name,
+        value: hasValue ? Number(item.value) : undefined,
+        rate:
+          hasValue
+            ? undefined
+            : hasRate
+              ? Number(item.rate)
+              : undefined,
+      };
+    });
 
 // 标准化条件对象
 const normalizeCondition = (conditionEnabled, condition) => {
@@ -408,23 +408,11 @@ const saveForm = async () => {
         low: Number(formModel.value.randomRate?.low || 0),
         high: Number(formModel.value.randomRate?.high || 0),
       },
-      weakStatus: normalizeStatus(
-        formModel.value.weakStatusEnabled,
-        formModel.value.weakStatus
-      ),
-      strongStatus: normalizeStatus(
-        formModel.value.strongStatusEnabled,
-        formModel.value.strongStatus
-      ),
-      armorStatus: normalizeStatus(
-        formModel.value.armorStatusEnabled,
-        formModel.value.armorStatus
-      ),
-      damageStatus: normalizeStatus(
-        formModel.value.damageStatusEnabled,
-        formModel.value.damageStatus
-      ),
     };
+    delete normalized.weakStatus;
+    delete normalized.strongStatus;
+    delete normalized.armorStatus;
+    delete normalized.damageStatus;
     delete normalized.weakStatusEnabled;
     delete normalized.strongStatusEnabled;
     delete normalized.armorStatusEnabled;
@@ -437,6 +425,7 @@ const saveForm = async () => {
       putStatus: normalizePutStatus(formModel.value.putStatus),
       changeValue: normalizeChangeValue(formModel.value.changeValue),
     };
+    delete normalized.hidden;
   }
 
   if (dialogType.value === "strengths") {
@@ -502,27 +491,47 @@ const removeItem = async (id) => {
 };
 
 // 添加附加状态项
-const addPutStatus = (list) => {
-  list.push({
+const addPutStatus = (target, key) => {
+  if (!target) return;
+  if (!Array.isArray(target[key])) {
+    target[key] = [];
+  }
+  target[key].push({
     name: "weak",
     round: 1,
-    value: 0,
+    value: null,
     rate: 1,
   });
 };
 
 // 添加数值变更项
-const addChangeValue = (list) => {
-  list.push({
+const addChangeValue = (target, key) => {
+  if (!target) return;
+  if (!Array.isArray(target[key])) {
+    target[key] = [];
+  }
+  target[key].push({
     self: true,
     name: "hp",
     value: 0,
-    rate: 0,
+    rate: null,
   });
+};
+
+// 数值/倍率二选一联动
+const handleExclusiveValueRate = (item, key, value) => {
+  if (!item) return;
+  if (key === "value" && value !== null && value !== undefined) {
+    item.rate = null;
+  }
+  if (key === "rate" && value !== null && value !== undefined) {
+    item.value = null;
+  }
 };
 
 // 删除列表中的某一项
 const removeListItem = (list, index) => {
+  if (!Array.isArray(list)) return;
   list.splice(index, 1);
 };
 </script>
@@ -653,7 +662,7 @@ const removeListItem = (list, index) => {
             <el-form-item label="归属">
               <el-input v-model="formModel.owner" />
             </el-form-item>
-            <el-form-item label="描述">
+            <el-form-item label="描述" class="form-full">
               <el-input v-model="formModel.des" type="textarea" :rows="2" />
             </el-form-item>
           </div>
@@ -706,6 +715,14 @@ const removeListItem = (list, index) => {
             </el-form-item>
           </div>
           <el-divider>列表配置</el-divider>
+          <div class="list-toolbar">
+            <el-button size="small" @click="strengthPreviewVisible = true">
+              查看被动详情
+            </el-button>
+            <el-button size="small" @click="skillPreviewVisible = true">
+              查看技能详情
+            </el-button>
+          </div>
           <div class="form-grid">
             <el-form-item label="被动 ID">
               <el-select
@@ -713,6 +730,8 @@ const removeListItem = (list, index) => {
                 multiple
                 filterable
                 allow-create
+                collapse-tags
+                :max-collapse-tags="4"
                 placeholder="输入或选择 ID"
               >
                 <el-option
@@ -729,6 +748,8 @@ const removeListItem = (list, index) => {
                 multiple
                 filterable
                 allow-create
+                collapse-tags
+                :max-collapse-tags="4"
                 placeholder="输入或选择 ID"
               >
                 <el-option
@@ -739,65 +760,6 @@ const removeListItem = (list, index) => {
                 />
               </el-select>
             </el-form-item>
-          </div>
-          <el-divider>状态配置</el-divider>
-          <div class="status-grid">
-            <div class="status-card">
-              <div class="status-head">
-                <span>弱化状态</span>
-                <el-switch v-model="formModel.weakStatusEnabled" />
-              </div>
-              <div v-if="formModel.weakStatusEnabled" class="status-body">
-                <el-form-item label="回合">
-                  <el-input-number v-model="formModel.weakStatus.round" :min="0" />
-                </el-form-item>
-                <el-form-item label="倍率">
-                  <el-input-number v-model="formModel.weakStatus.powerRate" :step="0.05" />
-                </el-form-item>
-              </div>
-            </div>
-            <div class="status-card">
-              <div class="status-head">
-                <span>强化状态</span>
-                <el-switch v-model="formModel.strongStatusEnabled" />
-              </div>
-              <div v-if="formModel.strongStatusEnabled" class="status-body">
-                <el-form-item label="回合">
-                  <el-input-number v-model="formModel.strongStatus.round" :min="0" />
-                </el-form-item>
-                <el-form-item label="倍率">
-                  <el-input-number v-model="formModel.strongStatus.powerRate" :step="0.05" />
-                </el-form-item>
-              </div>
-            </div>
-            <div class="status-card">
-              <div class="status-head">
-                <span>护甲状态</span>
-                <el-switch v-model="formModel.armorStatusEnabled" />
-              </div>
-              <div v-if="formModel.armorStatusEnabled" class="status-body">
-                <el-form-item label="回合">
-                  <el-input-number v-model="formModel.armorStatus.round" :min="0" />
-                </el-form-item>
-                <el-form-item label="数值">
-                  <el-input-number v-model="formModel.armorStatus.value" />
-                </el-form-item>
-              </div>
-            </div>
-            <div class="status-card">
-              <div class="status-head">
-                <span>伤害加成</span>
-                <el-switch v-model="formModel.damageStatusEnabled" />
-              </div>
-              <div v-if="formModel.damageStatusEnabled" class="status-body">
-                <el-form-item label="回合">
-                  <el-input-number v-model="formModel.damageStatus.round" :min="0" />
-                </el-form-item>
-                <el-form-item label="数值">
-                  <el-input-number v-model="formModel.damageStatus.value" />
-                </el-form-item>
-              </div>
-            </div>
           </div>
         </template>
 
@@ -810,7 +772,7 @@ const removeListItem = (list, index) => {
             <el-form-item label="名称">
               <el-input v-model="formModel.name" />
             </el-form-item>
-            <el-form-item label="描述">
+            <el-form-item label="描述" class="form-full">
               <el-input v-model="formModel.des" type="textarea" :rows="2" />
             </el-form-item>
             <el-form-item label="技能威力">
@@ -825,66 +787,100 @@ const removeListItem = (list, index) => {
             <el-form-item label="暴击率">
               <el-input-number v-model="formModel.criticalRate" :step="0.01" />
             </el-form-item>
-            <el-form-item label="隐藏">
-              <el-switch v-model="formModel.hidden" />
-            </el-form-item>
           </div>
           <el-divider>附加状态</el-divider>
           <div class="list-block">
-            <el-button size="small" @click="addPutStatus(formModel.putStatus)">
+            <el-button size="small" @click="addPutStatus(formModel, 'putStatus')">
               添加状态
             </el-button>
-            <div v-for="(item, index) in formModel.putStatus" :key="index" class="list-row">
-              <el-select v-model="item.name" placeholder="状态类型" class="list-field">
-                <el-option
-                  v-for="option in statusNameOptions"
-                  :key="option.value"
-                  :label="option.label"
-                  :value="option.value"
+            <div v-for="(item, index) in formModel.putStatus" :key="index" class="list-row list-row--status">
+              <div class="list-cell">
+                <span class="field-label">状态类型</span>
+                <el-select v-model="item.name" placeholder="状态类型" class="list-field">
+                  <el-option
+                    v-for="option in statusNameOptions"
+                    :key="option.value"
+                    :label="option.label"
+                    :value="option.value"
+                  />
+                </el-select>
+              </div>
+              <div class="list-cell">
+                <span class="field-label">回合</span>
+                <el-input-number size="small" v-model="item.round" :min="0" class="list-field" />
+              </div>
+              <div class="list-cell">
+                <span class="field-label">数值</span>
+                <el-input-number
+                  size="small"
+                  v-model="item.value"
+                  class="list-field"
+                  @change="handleExclusiveValueRate(item, 'value', $event)"
                 />
-              </el-select>
-              <el-input-number size="small" v-model="item.round" :min="0" class="list-field" />
-              <el-input-number size="small" v-model="item.value" class="list-field" >
-                <template #prefix>
-                  <span>数值(与倍率2选1)</span>
-                </template>
-              </el-input-number>
-              <el-input-number size="small" v-model="item.rate" :min="0" :max="1" :step="0.05" class="list-field" >
-                <template #prefix>
-                  <span>倍率</span>
-                </template>
-              </el-input-number>
-              <el-button size="small" type="danger" plain @click="removeListItem(formModel.putStatus, index)">
-                删除
-              </el-button>
+              </div>
+              <div class="list-cell">
+                <span class="field-label">倍率</span>
+                <el-input-number
+                  size="small"
+                  v-model="item.rate"
+                  :min="0"
+                  :max="1"
+                  :step="0.05"
+                  class="list-field"
+                  @change="handleExclusiveValueRate(item, 'rate', $event)"
+                />
+              </div>
+              <div class="list-cell list-cell--action">
+                <el-button size="small" type="danger" plain @click="removeListItem(formModel.putStatus, index)">
+                  删除
+                </el-button>
+              </div>
             </div>
           </div>
           <el-divider>属性变更</el-divider>
           <div class="list-block">
-            <el-button size="small" @click="addChangeValue(formModel.changeValue)">
+            <el-button size="small" @click="addChangeValue(formModel, 'changeValue')">
               添加变更
             </el-button>
-            <div v-for="(item, index) in formModel.changeValue" :key="index" class="list-row">
-              <el-switch v-model="item.self" active-text="自身" inactive-text="敌方" />
-              <el-select v-model="item.name" placeholder="属性" class="list-field">
-                <el-option
-                  v-for="option in changeValueOptions"
-                  :key="option.value"
-                  :label="option.label"
-                  :value="option.value"
+            <p class="list-hint">数值/倍率二选一，填写其一即可。</p>
+            <div v-for="(item, index) in formModel.changeValue" :key="index" class="list-row list-row--change">
+              <div class="list-cell">
+                <span class="field-label">目标</span>
+                <el-switch v-model="item.self" active-text="自身" inactive-text="敌方" />
+              </div>
+              <div class="list-cell">
+                <span class="field-label">属性</span>
+                <el-select v-model="item.name" placeholder="属性" class="list-field">
+                  <el-option
+                    v-for="option in changeValueOptions"
+                    :key="option.value"
+                    :label="option.label"
+                    :value="option.value"
+                  />
+                </el-select>
+              </div>
+              <div class="list-cell">
+                <span class="field-label">数值</span>
+                <el-input-number
+                  size="small"
+                  v-model="item.value"
+                  class="list-field"
+                  @change="handleExclusiveValueRate(item, 'value', $event)"
                 />
-              </el-select>
-              <el-input-number size="small" v-model="item.value" class="list-field" >
-                <template #prefix>
-                  <span>数值(与倍率2选1)</span>
-                </template>
-              </el-input-number>
-              <el-input-number size="small" v-model="item.rate" :min="0" :max="1" :step="0.05" class="list-field" >
-                <template #prefix>
-                  <span>倍率</span>
-                </template>
-              </el-input-number>
-              <div>
+              </div>
+              <div class="list-cell">
+                <span class="field-label">倍率</span>
+                <el-input-number
+                  size="small"
+                  v-model="item.rate"
+                  :min="0"
+                  :max="1"
+                  :step="0.05"
+                  class="list-field"
+                  @change="handleExclusiveValueRate(item, 'rate', $event)"
+                />
+              </div>
+              <div class="list-cell list-cell--action">
                 <el-button type="danger" plain @click="removeListItem(formModel.changeValue, index)">
                   删除
                 </el-button>
@@ -902,7 +898,7 @@ const removeListItem = (list, index) => {
             <el-form-item label="名称">
               <el-input v-model="formModel.name" />
             </el-form-item>
-            <el-form-item label="描述">
+            <el-form-item label="描述" class="form-full">
               <el-input v-model="formModel.des" type="textarea" :rows="2" />
             </el-form-item>
             <el-form-item label="威力">
@@ -991,7 +987,7 @@ const removeListItem = (list, index) => {
           </div>
           <el-divider>附加状态</el-divider>
           <div class="list-block">
-            <el-button size="small" @click="addPutStatus(formModel.status)">添加状态</el-button>
+            <el-button size="small" @click="addPutStatus(formModel, 'status')">添加状态</el-button>
             <div v-for="(item, index) in formModel.status" :key="index" class="list-row">
               <el-select v-model="item.name" placeholder="状态类型" class="list-field">
                 <el-option
@@ -1002,8 +998,19 @@ const removeListItem = (list, index) => {
                 />
               </el-select>
               <el-input-number v-model="item.round" :min="0" class="list-field" />
-              <el-input-number v-model="item.value" class="list-field" />
-              <el-input-number v-model="item.rate" :step="0.05" class="list-field" />
+              <el-input-number
+                v-model="item.value"
+                class="list-field"
+                @change="handleExclusiveValueRate(item, 'value', $event)"
+              />
+              <el-input-number
+                v-model="item.rate"
+                :min="0"
+                :max="1"
+                :step="0.05"
+                class="list-field"
+                @change="handleExclusiveValueRate(item, 'rate', $event)"
+              />
               <el-button type="danger" plain @click="removeListItem(formModel.status, index)">
                 删除
               </el-button>
@@ -1011,7 +1018,7 @@ const removeListItem = (list, index) => {
           </div>
           <el-divider>属性变更</el-divider>
           <div class="list-block">
-            <el-button size="small" @click="addChangeValue(formModel.changeValue)">
+            <el-button size="small" @click="addChangeValue(formModel, 'changeValue')">
               添加变更
             </el-button>
             <div v-for="(item, index) in formModel.changeValue" :key="index" class="list-row">
@@ -1024,8 +1031,19 @@ const removeListItem = (list, index) => {
                   :value="option.value"
                 />
               </el-select>
-              <el-input-number v-model="item.value" class="list-field" />
-              <el-input-number v-model="item.rate" :step="0.05" class="list-field" />
+              <el-input-number
+                v-model="item.value"
+                class="list-field"
+                @change="handleExclusiveValueRate(item, 'value', $event)"
+              />
+              <el-input-number
+                v-model="item.rate"
+                :min="0"
+                :max="1"
+                :step="0.05"
+                class="list-field"
+                @change="handleExclusiveValueRate(item, 'rate', $event)"
+              />
               <el-button type="danger" plain @click="removeListItem(formModel.changeValue, index)">
                 删除
               </el-button>
@@ -1037,6 +1055,40 @@ const removeListItem = (list, index) => {
         <el-button @click="dialogVisible = false">取消</el-button>
         <el-button type="primary" @click="saveForm">保存</el-button>
       </template>
+    </el-dialog>
+
+    <el-dialog v-model="skillPreviewVisible" title="技能详情" width="760px">
+      <div class="details">
+        <div v-if="!customData.skills.length" class="empty-hint">暂无技能数据</div>
+        <div v-else class="preview-list">
+          <div v-for="skill in customData.skills" :key="skill.id" class="preview-card">
+            <div class="preview-head">
+              <span class="preview-title">#{{ skill.id }} {{ skill.name }}</span>
+              <span class="preview-meta">
+              威力 {{ skill.power ?? "-" }} · 命中 {{ skill.accuracy ?? "-" }} · 暴击 {{ skill.criticalRate ?? "-" }}
+            </span>
+            </div>
+            <p class="preview-desc">{{ skill.des || "无描述" }}</p>
+          </div>
+        </div>
+      </div>
+    </el-dialog>
+
+    <el-dialog v-model="strengthPreviewVisible" title="被动详情" width="760px">
+      <div class="details">
+        <div v-if="!customData.strengths.length" class="empty-hint">暂无被动数据</div>
+        <div v-else class="preview-list">
+          <div v-for="strength in customData.strengths" :key="strength.id" class="preview-card">
+            <div class="preview-head">
+              <span class="preview-title">#{{ strength.id }} {{ strength.name }}</span>
+              <span class="preview-meta">
+              威力 {{ strength.power ?? "-" }} · 命中 {{ strength.accuracy ?? "-" }}
+            </span>
+            </div>
+            <p class="preview-desc">{{ strength.des || "无描述" }}</p>
+          </div>
+        </div>
+      </div>
     </el-dialog>
   </section>
 </template>
@@ -1131,31 +1183,14 @@ const removeListItem = (list, index) => {
   gap: 12px 16px;
 }
 
-.status-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 6px;
+.form-full {
+  grid-column: 1 / -1;
 }
 
-.status-card {
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  padding: 6px;
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.status-head {
+.list-toolbar {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-  font-size: 13px;
-}
-
-.status-body {
-  display: flex;
-  flex-direction: column;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .list-block {
@@ -1171,12 +1206,89 @@ const removeListItem = (list, index) => {
   align-items: center;
 }
 
+.list-row--status {
+  grid-template-columns: minmax(160px, 1.4fr) repeat(3, minmax(120px, 1fr)) auto;
+  align-items: end;
+}
+
+.list-row--change {
+  grid-template-columns: minmax(140px, 1fr) minmax(180px, 1.2fr) repeat(2, minmax(120px, 1fr)) auto;
+  align-items: end;
+}
+
+.list-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.list-cell--action {
+  align-self: end;
+}
+
+.field-label {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.list-hint {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.6);
+}
+
 .list-field {
   width: 100%;
 }
 
 .select-field {
   width: 100%;
+}
+
+.preview-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+}
+
+.preview-card {
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.03);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.preview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.preview-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.preview-meta {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.preview-desc {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.72);
+}
+
+.empty-hint {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.6);
 }
 
 .condition-block {
@@ -1205,6 +1317,15 @@ const removeListItem = (list, index) => {
   margin: 0;
   font-size: 13px;
   color: rgba(255, 255, 255, 0.6);
+}
+
+.custom-module :deep(.el-button) {
+  width: auto;
+  display: inline-flex;
+}
+.details{
+  max-height: 75vh;
+  overflow: scroll;
 }
 
 @media (max-width: 768px) {
