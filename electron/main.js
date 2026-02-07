@@ -8,7 +8,17 @@ const __dirname = path.dirname(__filename)
 const isDev = !app.isPackaged
 
 const projectRoot = path.resolve(__dirname, '..')
+
+// 获取可写数据目录
+function getWritableDataDir() {
+  if (app.isPackaged) {
+    return path.join(app.getPath('userData'), 'data')
+  }
+  return path.join(projectRoot, 'src', 'game', 'data')
+}
+
 const dataDirectories = [
+  getWritableDataDir(),
   path.join(projectRoot, 'src', 'game', 'data'),
   path.join(projectRoot, 'public', 'data'),
   path.join(projectRoot, 'dist', 'data'),
@@ -42,6 +52,32 @@ function loadGameData() {
 // 提供同步数据读取，避免 preload 沙盒访问 fs
 ipcMain.on('demo:get-data-sync', (event) => {
   event.returnValue = loadGameData()
+})
+
+// 保存数据到可写目录
+ipcMain.handle('demo:save-data', async (event, payload) => {
+  const dataDir = getWritableDataDir()
+  try {
+    fs.mkdirSync(dataDir, { recursive: true })
+    fs.writeFileSync(
+      path.join(dataDir, 'units.json'),
+      JSON.stringify(payload?.units ?? [], null, 2),
+      'utf-8'
+    )
+    fs.writeFileSync(
+      path.join(dataDir, 'skills.json'),
+      JSON.stringify(payload?.skills ?? [], null, 2),
+      'utf-8'
+    )
+    fs.writeFileSync(
+      path.join(dataDir, 'strengths.json'),
+      JSON.stringify(payload?.strengths ?? [], null, 2),
+      'utf-8'
+    )
+    return { ok: true }
+  } catch (error) {
+    return { ok: false, error: String(error?.message || error) }
+  }
 })
 
 // 创建主窗口

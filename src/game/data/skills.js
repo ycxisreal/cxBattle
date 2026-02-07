@@ -294,7 +294,6 @@ const baseSkills = [
     power: 15,
     accuracy: 1,
     criticalRate: 0,
-    hidden: true,
   },
 ];
 

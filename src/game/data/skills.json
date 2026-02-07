@@ -519,7 +519,6 @@
     "des": "用于数值调试的内部测试技能。",
     "power": 15,
     "accuracy": 1,
-    "criticalRate": 0,
-    "hidden": true
+    "criticalRate": 0
   }
 ]
