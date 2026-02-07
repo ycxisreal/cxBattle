@@ -1,5 +1,5 @@
-<script setup>
-import { computed, ref } from "vue";
+﻿<script setup>
+import { computed, ref, watchEffect } from "vue";
 import BattleLog from "./components/BattleLog.vue";
 import SkillCard from "./components/SkillCard.vue";
 import UnitCard from "./components/UnitCard.vue";
@@ -18,6 +18,9 @@ const {
 } = useBattle();
 
 const selectedUnitId = ref(null);
+const maxUnitDisplay = 6;
+const unitPage = ref(0);
+const showUnitModal = ref(false);
 const skillPage = ref(0);
 const selectedSkillIds = ref([]);
 const showSkillPool = ref(false);
@@ -34,10 +37,65 @@ const selectedUnit = computed(() =>
   availableUnits.value.find((unit) => unit.id === selectedUnitId.value)
 );
 
+// 计算角色分页总数
+const totalUnitPages = computed(() =>
+  Math.max(1, Math.ceil(availableUnits.value.length / maxUnitDisplay))
+);
+
+// 当前页展示的角色
+const pagedUnits = computed(() => {
+  const start = unitPage.value * maxUnitDisplay;
+  return availableUnits.value.slice(start, start + maxUnitDisplay);
+});
+
+// 是否需要分页控制
+const shouldShowUnitControls = computed(
+  () => availableUnits.value.length > maxUnitDisplay
+);
+
+// 当前页码（从 1 开始）
+const currentUnitPage = computed(() => unitPage.value + 1);
+
 // 获取当前侧边栏内容
 const activeSidebarTab = computed(
   () => sidebarTabs.find((tab) => tab.id === activeSidebarId.value) || sidebarTabs[0]
 );
+
+// 监听角色分页数据变化，确保页码不越界
+watchEffect(() => {
+  const maxPageIndex = totalUnitPages.value - 1;
+  if (unitPage.value > maxPageIndex) unitPage.value = maxPageIndex;
+});
+
+// 选择角色并在需要时关闭弹窗
+const handleSelectUnit = (unitId) => {
+  selectedUnitId.value = unitId;
+  showUnitModal.value = false;
+};
+
+// 轮转到上一页角色
+const prevUnitPage = () => {
+  if (!shouldShowUnitControls.value) return;
+  unitPage.value =
+    unitPage.value === 0 ? totalUnitPages.value - 1 : unitPage.value - 1;
+};
+
+// 轮转到下一页角色
+const nextUnitPage = () => {
+  if (!shouldShowUnitControls.value) return;
+  unitPage.value =
+    unitPage.value >= totalUnitPages.value - 1 ? 0 : unitPage.value + 1;
+};
+
+// 打开全部角色弹窗
+const openUnitModal = () => {
+  showUnitModal.value = true;
+};
+
+// 关闭全部角色弹窗
+const closeUnitModal = () => {
+  showUnitModal.value = false;
+};
 
 const startBattle = () => {
   if (!selectedUnitId.value) return;
@@ -123,14 +181,40 @@ const closeFormulaModal = () => {
           <h3>选择你的角色</h3>
           <p>选择一名角色进入战斗，对手将随机生成。</p>
         </div>
+        <div class="select-controls">
+          <p class="page-indicator">
+            第 {{ currentUnitPage }} / {{ totalUnitPages }} 页，最多展示 {{ maxUnitDisplay }} 名
+          </p>
+          <div class="select-actions">
+            <button
+              class="ghost"
+              type="button"
+              :disabled="!shouldShowUnitControls"
+              @click="prevUnitPage"
+            >
+              上一批
+            </button>
+            <button
+              class="ghost"
+              type="button"
+              :disabled="!shouldShowUnitControls"
+              @click="nextUnitPage"
+            >
+              下一批
+            </button>
+            <button class="primary" type="button" @click="openUnitModal">
+              查看全部
+            </button>
+          </div>
+        </div>
         <div class="select-grid">
           <button
-            v-for="unit in availableUnits"
+            v-for="unit in pagedUnits"
             :key="unit.id"
             class="select-card"
             :class="{ active: selectedUnitId === unit.id }"
             type="button"
-            @click="selectedUnitId = unit.id"
+            @click="handleSelectUnit(unit.id)"
           >
             <h4>{{ unit.name }}</h4>
             <p class="des">{{ unit.des }}</p>
@@ -264,6 +348,42 @@ const closeFormulaModal = () => {
           <p class="formula note">
             说明：随机(x) 表示在随机倍率区间内取值；状态倍率来自强/弱状态，默认 1。
           </p>
+        </div>
+      </div>
+    </div>
+
+    <div
+      v-if="showUnitModal"
+      class="modal-backdrop"
+      @click.self="closeUnitModal"
+    >
+      <div class="modal unit-modal">
+        <div class="modal-header">
+          <h4>选择角色</h4>
+          <button class="ghost" type="button" @click="closeUnitModal">
+            关闭
+          </button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-hint">点击角色即可选择并关闭弹窗。</p>
+          <div class="unit-modal-grid">
+            <button
+              v-for="unit in availableUnits"
+              :key="unit.id"
+              class="select-card modal-card"
+              :class="{ active: selectedUnitId === unit.id }"
+              type="button"
+              @click="handleSelectUnit(unit.id)"
+            >
+              <h4>{{ unit.name }}</h4>
+              <p class="des">{{ unit.des }}</p>
+              <div class="stats">
+                <span>攻击 {{ unit.attack }}</span>
+                <span>防御 {{ unit.defence }}</span>
+                <span>速度 {{ unit.speed }}</span>
+              </div>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -512,6 +632,23 @@ h1 {
   line-height: 1.6;
 }
 
+.unit-modal {
+  width: min(960px, 96vw);
+}
+
+.modal-hint {
+  margin: 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.unit-modal-grid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
 .formula {
   margin: 0;
   padding: 10px 12px;
@@ -546,6 +683,21 @@ h1 {
 .select-head p {
   margin: 0;
   color: var(--text-muted);
+}
+
+.select-controls {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.select-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .select-grid {
