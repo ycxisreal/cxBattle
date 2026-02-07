@@ -1,6 +1,5 @@
 import { computed, reactive } from "vue";
-import { units } from "./data/units.js";
-import { skills, skillIndex } from "./data/skills.js";
+import { units, skills, skillIndex } from "./data/runtimeData.js";
 import {
   applyRandomMode,
   createUnitInstance,
