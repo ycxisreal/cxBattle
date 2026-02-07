@@ -1,0 +1,247 @@
+export const strengths = [
+  {
+    id: 1,
+    name: "间隔打击",
+    des: "按照固定回合间隔触发一次额外攻击。",
+    condition: {
+      type: ">=",
+      interval: 1,
+    },
+    power: 15,
+    accuracy: 0.8,
+  },
+  {
+    id: 2,
+    name: "低血奋起",
+    des: "当生命值低于一定阈值时，恢复少量生命。",
+    condition: {
+      type: "<",
+      selfCondition: {
+        healthRate: 0.5,
+        health: 50,
+      },
+    },
+    changeValue: [{ self: true, name: "hp", value: 10 }],
+    accuracy: 1,
+  },
+  {
+    id: 3,
+    name: "战士本能",
+    des: "生命值较低时触发的求生本能爆发。",
+    condition: {
+      type: "<",
+      selfCondition: {
+        healthRate: 0.35,
+      },
+    },
+    power: 12,
+    accuracy: 0.85,
+  },
+
+  // ========== 新增：输出/爆发 ==========
+  {
+    id: 4,
+    name: "精准时机",
+    des: "每2回合有概率触发一次强化攻击。",
+    condition: {
+      interval: 2,
+      dice: 0.4,
+    },
+    power: 20,
+    accuracy: 0.9,
+  },
+  {
+    id: 5,
+    name: "压制攻击",
+    des: "敌方生命比例较高时，额外伤害更容易触发。",
+    condition: {
+      type: ">",
+      enemyCondition: {
+        healthRate: 0.7,
+      },
+    },
+    power: 18,
+    accuracy: 0.85,
+  },
+  {
+    id: 6,
+    name: "终结手法",
+    des: "敌方生命比例低于30%时触发：造成一次更具杀伤力的攻击。",
+    condition: {
+      type: "<",
+      enemyCondition: {
+        healthRate: 0.3,
+      },
+    },
+    power: 26,
+    accuracy: 0.9,
+  },
+  {
+    id: 7,
+    name: "破甲专注",
+    des: "每3回合有概率触发：削弱敌方防御。",
+    condition: {
+      interval: 3,
+      dice: 0.45,
+    },
+    changeValue: [{ self: false, name: "defence", value: 5 }],
+    accuracy: 0.85,
+  },
+
+  // ========== 新增：生存/防御 ==========
+  {
+    id: 8,
+    name: "防御反射",
+    des: "生命比例低于40%时触发：小幅提升防御。",
+    condition: {
+      type: "<",
+      selfCondition: {
+        healthRate: 0.4,
+      },
+    },
+    changeValue: [{ self: true, name: "defence", value: 4 }],
+    accuracy: 1,
+  },
+  {
+    id: 9,
+    name: "坚韧意志",
+    des: "每3回合有较高概率触发：短时间减少所受伤害。",
+    condition: {
+      interval: 3,
+      dice: 0.6,
+    },
+    putStatus: [{ name: "damage", round: 2, value: -4 }],
+    accuracy: 1,
+  },
+  {
+    id: 10,
+    name: "临危护甲",
+    des: "生命比例低于35%时触发：获得短护甲以提高生存。",
+    condition: {
+      type: "<",
+      selfCondition: {
+        healthRate: 0.35,
+      },
+    },
+    putStatus: [{ name: "armor", round: 2, value: 6 }],
+    accuracy: 1,
+  },
+
+  // ========== 新增：续航/回复 ==========
+  {
+    id: 11,
+    name: "战斗回复",
+    des: "每回合稳定回复少量生命值。",
+    condition: {
+      interval: 1,
+      dice: 1,
+    },
+    changeValue: [{ self: true, name: "hp", value: 3 }],
+    accuracy: 1,
+  },
+  {
+    id: 13,
+    name: "二次呼吸",
+    des: "每4回合触发：回复更多生命值。",
+    condition: {
+      interval: 4,
+      dice: 0.75,
+    },
+    changeValue: [{ self: true, name: "hp", value: 12 }],
+    accuracy: 1,
+  },
+
+  // ========== 新增：控制/干扰 ==========
+  {
+    id: 14,
+    name: "压迫气场",
+    des: "每3回合有概率触发：使敌方进入弱化状态。",
+    condition: {
+      interval: 3,
+      dice: 0.4,
+    },
+    putStatus: [{ name: "weak", round: 2, rate: 0.8 }],
+    accuracy: 0.85,
+  },
+  {
+    id: 15,
+    name: "迟缓打击",
+    des: "每回合有概率触发：降低敌方速度。",
+    condition: {
+      interval: 1,
+      dice: 0.3,
+    },
+    changeValue: [{ self: false, name: "speed", value: 1 }],
+    accuracy: 0.8,
+  },
+  {
+    id: 16,
+    name: "攻势削弱",
+    des: "每2回合有概率触发：降低敌方攻击力。",
+    condition: {
+      interval: 2,
+      dice: 0.35,
+    },
+    changeValue: [{ self: false, name: "attack", value: 3 }],
+    accuracy: 0.85,
+  },
+
+  // ========== 新增：节奏/成长 ==========
+  {
+    id: 17,
+    name: "战斗节奏",
+    des: "每2回合有概率触发：逐渐提升攻击力。",
+    condition: {
+      interval: 2,
+      dice: 0.5,
+    },
+    changeValue: [{ self: true, name: "attack", value: 2 }],
+    accuracy: 1,
+  },
+  {
+    id: 18,
+    name: "身法",
+    des: "每回合有概率触发：提高闪避能力。",
+    condition: {
+      interval: 1,
+      dice: 0.25,
+    },
+    changeValue: [{ self: true, name: "missRate", rate: 0.04 }],
+    accuracy: 1,
+  },
+  {
+    id: 19,
+    name: "稳准狠",
+    des: "每3回合触发：对敌方造成一定伤害。",
+    condition: {
+      interval: 3,
+      dice: 0.6,
+    },
+    power: 16,
+    accuracy: 0.95,
+  },
+
+  // ========== 新增：暴击/抗暴 ==========
+  {
+    id: 20,
+    name: "致命直觉",
+    des: "每回合有概率触发：小幅提升暴击率。",
+    condition: {
+      interval: 1,
+      dice: 0.25,
+    },
+    changeValue: [{ self: true, name: "criticalRate", rate: 0.08 }],
+    accuracy: 1,
+  },
+  {
+    id: 21,
+    name: "泼水冷静",
+    des: "使对方保持冷静，降低对方暴击率",
+    condition: {
+      interval: 1,
+      dice: 1,
+    },
+    changeValue: [{ self: false, name: "criticalRate", rate: -0.05 }],
+    accuracy: 1,
+  },
+];
