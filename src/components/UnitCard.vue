@@ -133,6 +133,14 @@ const formatCondition = (condition) => {
           角色的各个属性值会在战斗开始按照随机倍率的范围随机改变。
         </div>
       </li>
+      <li>
+        <span>闪避率</span>
+        <strong>{{((unit?.missRate ?? 0) * 100).toFixed(0)}}%</strong>
+      </li>
+      <li>
+        <span>每回合回复</span>
+        <strong>{{ unit?.healPerRound?.toFixed(1) || 0 }}</strong>
+      </li>
     </ul>
     <div class="strengths">
       <button

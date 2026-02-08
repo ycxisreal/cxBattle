@@ -164,9 +164,8 @@ const closeFormulaModal = () => {
     <header v-if="state.phase === 'select'" class="hero">
       <div>
         <p class="kicker">Turn-based Combo Game</p>
-        <h1>回合制出招 · 可视化战斗</h1>
+        <h1>cxBattle</h1>
         <p class="subtitle">
-          在招式与状态之间找到节奏，速度决定先手，连招触发被动。
         </p>
       </div>
       <div class="hero-actions">
