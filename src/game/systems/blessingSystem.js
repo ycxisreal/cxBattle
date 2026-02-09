@@ -1,4 +1,12 @@
 // 创建祝福实现注册表，返回 implKey 对应的事件处理器集合。
+const outputBlessingLog = (ctx, text) => {
+  if (typeof ctx?.sideLog === "function") {
+    ctx.sideLog(text);
+    return;
+  }
+  ctx?.log?.(text);
+};
+
 const createBlessingRegistry = () => ({
   player_damage_boost: ({ state, blessingDef }) => ({
     onBeforeDamage(ctx) {
@@ -8,7 +16,8 @@ const createBlessingRegistry = () => ({
         Number(state.blessings.find((item) => item.id === blessingDef.id)?.stack || 1);
       const bonusRate = 0.12 * Math.max(1, stack);
       ctx.damage *= 1 + bonusRate;
-      ctx.log?.(
+      outputBlessingLog(
+        ctx,
         `[祝福] ${blessingDef.name}触发：技能伤害提高${Math.floor(bonusRate * 100)}%`
       );
     },
@@ -22,7 +31,7 @@ const createBlessingRegistry = () => ({
       state.player.hp = Math.min(state.player.hp + 8 * Math.max(1, stack), state.player.hpCount);
       const healed = Math.floor(state.player.hp - before);
       if (healed > 0) {
-        ctx.log?.(`[祝福] ${blessingDef.name}触发：恢复${healed}点生命`);
+        outputBlessingLog(ctx, `[祝福] ${blessingDef.name}触发：恢复${healed}点生命`);
       }
     },
   }),

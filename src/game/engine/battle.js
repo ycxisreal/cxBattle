@@ -386,6 +386,7 @@ const executeStrength = (attacker, defender, round, addLog, onEvent, hookBridge)
           damage: ctx.damage,
           isStrength: true,
           log: addLog,
+          sideLog: hookBridge?.sideLog,
           meta: {},
         };
         emitHook(hookBridge, "onBeforeDamage", payload);
@@ -401,6 +402,7 @@ const executeStrength = (attacker, defender, round, addLog, onEvent, hookBridge)
         damage: msg.damage,
         isStrength: true,
         log: addLog,
+        sideLog: hookBridge?.sideLog,
         meta: {},
       });
       if (msg.damage > 0 && onEvent) {
@@ -536,6 +538,7 @@ export const executeSkill = (
     target: defender,
     skill,
     log: addLog,
+    sideLog: hookBridge?.sideLog,
     meta: {},
   });
   let isMissed = false;
@@ -551,6 +554,7 @@ export const executeSkill = (
         damage: ctx.damage,
         isStrength: false,
         log: addLog,
+        sideLog: hookBridge?.sideLog,
         meta: {},
       };
       emitHook(hookBridge, "onBeforeDamage", payload);
@@ -567,6 +571,7 @@ export const executeSkill = (
       damage: damageInfo.damage,
       isStrength: false,
       log: addLog,
+      sideLog: hookBridge?.sideLog,
       meta: {},
     });
     if (damageInfo.damage > 0 && onEvent) {

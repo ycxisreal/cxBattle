@@ -370,6 +370,13 @@ const preDraftSelectedCost = computed(() =>
             </div>
             <p v-if="state.chainMode" class="enemy-index-text">当前第 {{ state.enemyIndex }} 个敌人</p>
           </div>
+          <div class="side-log-panel">
+            <p class="side-log-title">祝福/设置日志（最多10条）</p>
+            <ul class="side-log-list">
+              <li v-for="item in state.sideLog" :key="item.id">{{ item.text }}</li>
+              <li v-if="!state.sideLog.length">暂无记录</li>
+            </ul>
+          </div>
         </div>
       </aside>
 
@@ -942,6 +949,33 @@ h1 {
   flex-direction: column;
   align-items: flex-start;
   gap: 6px;
+}
+
+.side-log-panel {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.side-log-title {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.side-log-list {
+  margin: 8px 0 0;
+  padding-left: 16px;
+  max-height: 220px;
+  overflow: auto;
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.side-log-list li {
+  line-height: 1.45;
 }
 
 .sidebar-tab {

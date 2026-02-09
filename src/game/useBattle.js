@@ -24,6 +24,7 @@ import {
 } from "./systems/draftSystem.js";
 
 const MAX_LOGS = 120;
+const MAX_SIDE_LOGS = 10;
 const PRE_DRAFT_REFRESH_COST = 1;
 const DEFAULT_MID_DRAFT_INTERVAL = 10;
 const MAX_EQUIPMENT_SLOTS = 2;
@@ -171,6 +172,17 @@ const createLogManager = (state) => ({
   },
 });
 
+// 侧边短日志，仅用于设置变更与祝福相关提示。
+const createSideLogManager = (state) => ({
+  push: (text) => {
+    state.sideLog.unshift({
+      id: `${Date.now()}-${Math.random()}`,
+      text,
+    });
+    if (state.sideLog.length > MAX_SIDE_LOGS) state.sideLog.pop();
+  },
+});
+
 export const useBattle = () => {
   let hookBus = createHookBus();
   const state = reactive({
@@ -204,6 +216,7 @@ export const useBattle = () => {
       midDraftRoundInterval: DEFAULT_MID_DRAFT_INTERVAL,
     },
     log: [],
+    sideLog: [],
     effects: {
       playerHit: false,
       enemyHit: false,
@@ -213,8 +226,12 @@ export const useBattle = () => {
   });
 
   const logger = createLogManager(state);
+  const sideLogger = createSideLogManager(state);
   const log = (text, type = "text") => {
     logger.push(text, type, state.round);
+  };
+  const sideLog = (text) => {
+    sideLogger.push(text);
   };
 
   // 构造祝福钩子上下文中的会话快照。
@@ -236,6 +253,7 @@ export const useBattle = () => {
       session: getHookSession(),
       round: state.round,
       log,
+      sideLog,
       meta: {},
       ...payload,
     });
@@ -253,6 +271,7 @@ export const useBattle = () => {
     state.draft.preCandidates = [];
     state.draft.midCandidates = [];
     state.draft.selectedPreIds = [];
+    state.sideLog = [];
   };
 
   const pointsRemaining = computed(() =>
@@ -299,8 +318,11 @@ export const useBattle = () => {
     state.chainGrowthLevel += 1;
     state.enemy = createEnemyByDifficulty(nextEnemyBase, state.chainGrowthLevel);
     state.enemyIndex += 1;
-    log(
+    sideLog(
       `连战继续：第${state.enemyIndex}个敌人 ${state.enemy.name} 登场（连战成长层数 ${state.chainGrowthLevel}）`
+    );
+    sideLog(
+      `连战成长：下一敌人倍率 +${(state.chainGrowthLevel * 0.2).toFixed(1)}，回复 +${state.chainGrowthLevel}`
     );
   };
 
@@ -325,7 +347,7 @@ export const useBattle = () => {
     );
     state.draft.selectedPreIds = [];
     state.draft.prePending = true;
-    log(`战前构筑：可用点数 ${state.pointsTotal}，请选择祝福/装备。`);
+    sideLog(`战前构筑：可用点数 ${state.pointsTotal}，请选择祝福/装备。`);
   };
 
   // 安装祝福并写入运行时列表。
@@ -356,7 +378,7 @@ export const useBattle = () => {
     state.draft.midCandidates = buildMidDraftCandidates(getAvailableBlessingPool(), 3);
     state.draft.midPending = state.draft.midCandidates.length > 0;
     if (state.draft.midPending) {
-      log(`祝福三选一触发：${reasonText}`);
+      sideLog(`祝福三选一触发：${reasonText}`);
     }
   };
 
@@ -426,7 +448,7 @@ export const useBattle = () => {
   const refreshPreDraftCandidates = () => {
     if (!state.draft.prePending) return;
     if (pointsRemaining.value < state.draft.refreshCost) {
-      log("点数不足，无法刷新候选。");
+      sideLog("点数不足，无法刷新候选。");
       return;
     }
     state.pointsUsed += state.draft.refreshCost;
@@ -435,7 +457,7 @@ export const useBattle = () => {
       equipmentAffixes
     );
     state.draft.selectedPreIds = [];
-    log(`已消耗${state.draft.refreshCost}点刷新候选。`);
+    sideLog(`已消耗${state.draft.refreshCost}点刷新候选。`);
   };
 
   // 确认战前构筑并应用属性/祝福。
@@ -445,7 +467,7 @@ export const useBattle = () => {
     const pickedItems = state.draft.preCandidates.filter((item) => pickSet.has(item.draftId));
     const totalCost = pickedItems.reduce((sum, item) => sum + Number(item.cost || 0), 0);
     if (totalCost > pointsRemaining.value) {
-      log("点数不足，无法确认当前构筑。");
+      sideLog("点数不足，无法确认当前构筑。");
       return;
     }
 
@@ -459,7 +481,7 @@ export const useBattle = () => {
       }
     }
     if (state.equipments.length + nextEquipments.length > MAX_EQUIPMENT_SLOTS) {
-      log(`装备槽位上限为${MAX_EQUIPMENT_SLOTS}，请减少装备选择。`);
+      sideLog(`装备槽位上限为${MAX_EQUIPMENT_SLOTS}，请减少装备选择。`);
       return;
     }
 
@@ -473,7 +495,7 @@ export const useBattle = () => {
     });
     state.draft.prePending = false;
     state.draft.selectedPreIds = [];
-    log(
+    sideLog(
       `构筑完成：获得${grantedBlessingCount}个祝福、${nextEquipments.length}件装备，剩余点数${pointsRemaining.value}。`
     );
     emitBattleHook("onBattleStart");
@@ -486,13 +508,13 @@ export const useBattle = () => {
     if (!blessingDef) return;
     const result = grantBlessing(blessingDef);
     if (!result?.ok) {
-      log(result?.message || "祝福获取失败");
+      sideLog(result?.message || "祝福获取失败");
       return;
     }
     state.draft.midPending = false;
     state.draft.midCandidates = [];
     const stackText = state.blessings.find((item) => item.id === blessingDef.id)?.stack || 1;
-    log(`已获得祝福：${blessingDef.name}（当前层数 ${stackText}）`);
+    sideLog(`已获得祝福：${blessingDef.name}（当前层数 ${stackText}）`);
   };
 
   const resetBattle = () => {
@@ -596,6 +618,7 @@ export const useBattle = () => {
       {
         hookBus,
         getSession: getHookSession,
+        sideLog,
       }
     );
     const overResult = checkOver(attacker, defender);
@@ -658,14 +681,14 @@ export const useBattle = () => {
     state.difficulty = difficultyKey;
     if (state.phase === "battle" && state.enemy) {
       refreshEnemyByDifficulty();
-      log(`难度已切换为${DIFFICULTY_OPTIONS.find((d) => d.key === difficultyKey)?.label}`);
+      sideLog(`难度已切换为${DIFFICULTY_OPTIONS.find((d) => d.key === difficultyKey)?.label}`);
     }
   };
 
   // 切换连战模式，开启后击败敌人会自动进入下一场。
   const toggleChainMode = () => {
     state.chainMode = !state.chainMode;
-    log(state.chainMode ? "已开启连战模式" : "已关闭连战模式");
+    sideLog(state.chainMode ? "已开启连战模式" : "已关闭连战模式");
   };
 
   const availableUnits = computed(() => units);
