@@ -1,6 +1,6 @@
 {
   "name": "cxBattle",
-  "version": "1.0.3",
+  "version": "1.2.1",
   "private": true,
   "type": "module",
   "main": "electron/main.js",
