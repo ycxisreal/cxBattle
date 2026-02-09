@@ -21,12 +21,14 @@ const customData = reactive({
   units: cloneData(runtimeUnits) || [],
   skills: cloneData(runtimeSkills) || [],
   strengths: cloneData(runtimeStrengths) || [],
+  blessings: cloneData(runtimeBlessings) || [],
 });
 
 const typeLabels = {
   units: "角色",
   skills: "技能",
   strengths: "被动",
+  blessings: "祝福",
 };
 
 const statusNameOptions = [
@@ -60,6 +62,7 @@ const selectedIds = reactive({
   units: null,
   skills: null,
   strengths: null,
+  blessings: null,
 });
 const selectedId = computed({
   get: () => selectedIds[dialogType.value],
@@ -106,6 +109,7 @@ const prepareFormByType = (type) => {
   if (type === "units") formModel.value = createDefaultUnit();
   if (type === "skills") formModel.value = createDefaultSkill();
   if (type === "strengths") formModel.value = createDefaultStrength();
+  if (type === "blessings") formModel.value = createDefaultBlessing();
 };
 
 // 获取下一个可用 ID
@@ -189,6 +193,19 @@ const createDefaultStrength = () => ({
   accuracy: 1,
 });
 
+// 创建默认祝福
+const createDefaultBlessing = () => ({
+  id: getNextId(customData.blessings),
+  name: "新祝福",
+  quality: "C",
+  cost: 1,
+  desc: "",
+  implKey: "",
+  repeatable: false,
+  maxStack: 1,
+  tags: [],
+});
+
 // 构建角色表单
 const buildUnitForm = (unit) => {
   const base = cloneData(unit) || {};
@@ -245,6 +262,13 @@ const buildStrengthForm = (strength) => {
   };
 };
 
+// 构建祝福表单
+const buildBlessingForm = (blessing) => ({
+  ...createDefaultBlessing(),
+  ...(cloneData(blessing) || {}),
+  tags: Array.isArray(blessing?.tags) ? cloneData(blessing.tags) : [],
+});
+
 // 打开新增弹窗
 const openAdd = (type) => {
   if (!isElectronEnv) return;
@@ -293,6 +317,7 @@ const confirmSelect = () => {
     if (dialogType.value === "units") formModel.value = buildUnitForm(item);
     if (dialogType.value === "skills") formModel.value = buildSkillForm(item);
     if (dialogType.value === "strengths") formModel.value = buildStrengthForm(item);
+    if (dialogType.value === "blessings") formModel.value = buildBlessingForm(item);
     selectVisible.value = false;
     dialogMode.value = "edit";
     dialogVisible.value = true;
@@ -381,7 +406,7 @@ const syncData = async () => {
     units: cloneData(customData.units),
     skills: cloneData(customData.skills),
     strengths: cloneData(customData.strengths),
-    blessings: cloneData(runtimeBlessings),
+    blessings: cloneData(customData.blessings),
     equipmentAffixes: cloneData(runtimeEquipmentAffixes),
   };
   updateRuntimeData(payload);
@@ -443,6 +468,31 @@ const saveForm = async () => {
       changeValue: normalizeChangeValue(formModel.value.changeValue),
     };
     delete normalized.conditionEnabled;
+  }
+
+  if (dialogType.value === "blessings") {
+    normalized = {
+      ...cloneData(formModel.value),
+      quality: String(formModel.value.quality || "C"),
+      cost: Number(formModel.value.cost || 0),
+      implKey: String(formModel.value.implKey || "").trim(),
+      repeatable: Boolean(formModel.value.repeatable),
+      maxStack: Math.max(1, Number(formModel.value.maxStack || 1)),
+      tags: (Array.isArray(formModel.value.tags) ? formModel.value.tags : [])
+        .map((tag) => String(tag).trim())
+        .filter(Boolean),
+    };
+    if (!["A", "B", "C"].includes(normalized.quality)) {
+      ElMessage.warning("祝福品质必须为 A/B/C");
+      return;
+    }
+    if (!normalized.implKey) {
+      ElMessage.warning("implKey 不能为空");
+      return;
+    }
+    if (!normalized.repeatable) {
+      normalized.maxStack = 1;
+    }
   }
 
   if (!normalized) return;
@@ -545,7 +595,7 @@ const removeListItem = (list, index) => {
     <header class="custom-head">
       <div>
         <h3>自定义模块</h3>
-        <p>在 Electron 端管理角色、技能与被动数据。</p>
+        <p>在 Electron 端管理角色、技能、被动与祝福数据。</p>
       </div>
       <span class="custom-badge" :class="{ disabled: !isElectronEnv }">
         {{ isElectronEnv ? "Electron 数据源" : "Web 端只读" }}
@@ -610,6 +660,28 @@ const removeListItem = (list, index) => {
             plain
             :disabled="!isElectronEnv"
             @click="openDelete('strengths')"
+          >
+            删除
+          </el-button>
+        </div>
+      </div>
+      <div class="custom-card">
+        <h4>祝福</h4>
+        <p>新增、编辑与删除祝福数据。</p>
+        <p class="warn-text">提示：修改祝福后需同步调整对应 implKey 的源码逻辑。</p>
+        <div class="custom-actions">
+          <el-button size="small" :disabled="!isElectronEnv" @click="openAdd('blessings')">
+            添加
+          </el-button>
+          <el-button size="small" :disabled="!isElectronEnv" @click="openEdit('blessings')">
+            编辑
+          </el-button>
+          <el-button
+            size="small"
+            type="danger"
+            plain
+            :disabled="!isElectronEnv"
+            @click="openDelete('blessings')"
           >
             删除
           </el-button>
@@ -1054,6 +1126,55 @@ const removeListItem = (list, index) => {
             </div>
           </div>
         </template>
+
+        <template v-if="dialogType === 'blessings'">
+          <el-divider>基础信息</el-divider>
+          <p class="warn-text form-warn">
+            提示：添加或编辑祝福需要同步修改源代码中相应祝福逻辑（implKey 对应 `blessingSystem.js`）。
+          </p>
+          <div class="form-grid">
+            <el-form-item label="ID">
+              <el-input-number v-model="formModel.id" :min="1" />
+            </el-form-item>
+            <el-form-item label="名称">
+              <el-input v-model="formModel.name" />
+            </el-form-item>
+            <el-form-item label="品质">
+              <el-select v-model="formModel.quality">
+                <el-option label="A" value="A" />
+                <el-option label="B" value="B" />
+                <el-option label="C" value="C" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="消耗点数">
+              <el-input-number v-model="formModel.cost" :min="0" />
+            </el-form-item>
+            <el-form-item label="逻辑键 implKey" class="form-full">
+              <el-input v-model="formModel.implKey" placeholder="如：player_damage_boost" />
+            </el-form-item>
+            <el-form-item label="是否可重复">
+              <el-switch v-model="formModel.repeatable" active-text="是" inactive-text="否" />
+            </el-form-item>
+            <el-form-item label="最大层数">
+              <el-input-number v-model="formModel.maxStack" :min="1" :disabled="!formModel.repeatable" />
+            </el-form-item>
+            <el-form-item label="标签" class="form-full">
+              <el-select
+                v-model="formModel.tags"
+                multiple
+                filterable
+                allow-create
+                default-first-option
+                collapse-tags
+                :max-collapse-tags="4"
+                placeholder="可输入多个标签"
+              />
+            </el-form-item>
+            <el-form-item label="描述" class="form-full">
+              <el-input v-model="formModel.desc" type="textarea" :rows="3" />
+            </el-form-item>
+          </div>
+        </template>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
@@ -1167,6 +1288,20 @@ const removeListItem = (list, index) => {
   margin: 0;
   font-size: 13px;
   color: rgba(255, 255, 255, 0.65);
+}
+
+.warn-text {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #ffd89a !important;
+}
+
+.form-warn {
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 210, 130, 0.35);
+  background: rgba(255, 173, 83, 0.12);
 }
 
 .custom-actions {
