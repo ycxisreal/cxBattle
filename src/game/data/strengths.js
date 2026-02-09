@@ -1,272 +1,368 @@
-export const strengths = [
+﻿export const strengths = [
   {
-    id: 1,
-    name: "稳定打击",
-    des: "每回合触发一次额外攻击。威力13，命中率60%",
-    condition: {
-      type: ">=",
-      interval: 1,
+    "id": 1,
+    "name": "稳定打击",
+    "des": "每回合触发一次额外攻击。威力13，命中率60%",
+    "condition": {
+      "type": ">=",
+      "interval": 1
     },
-    power: 13,
-    status: [],
-    changeValue: [],
-    accuracy: 0.6,
+    "power": 13,
+    "status": [],
+    "changeValue": [],
+    "accuracy": 0.6
   },
   {
-    id: 2,
-    name: "低血奋起",
-    des: "当生命值低于一定阈值时，恢复少量生命。",
-    condition: {
-      type: "<",
-      selfCondition: {
-        health: 50,
-        healthRate: 0.5,
-        attack: 0,
-        defence: 0,
-        attackRate: 0,
-        defenceRate: 0,
-      },
+    "id": 2,
+    "name": "低血奋起",
+    "des": "当生命值低于一定阈值时，恢复少量生命。",
+    "condition": {
+      "type": "<",
+      "selfCondition": {
+        "health": 50,
+        "healthRate": 0.5,
+        "attack": 0,
+        "defence": 0,
+        "attackRate": 0,
+        "defenceRate": 0
+      }
     },
-    power: 0,
-    status: [],
-    changeValue: [{ self: true, name: "hp", value: 10 }],
-    accuracy: 1,
+    "power": 0,
+    "status": [],
+    "changeValue": [
+      {
+        "self": true,
+        "name": "hp",
+        "value": 10
+      }
+    ],
+    "accuracy": 1
   },
   {
-    id: 3,
-    name: "战士本能",
-    des: "生命值较低时触发的求生本能爆发。生命值少于0.35时每回合造成15威力伤害",
-    condition: {
-      type: "<",
-      selfCondition: {
-        health: 0,
-        healthRate: 0.35,
-        attack: 0,
-        defence: 0,
-        attackRate: 0,
-        defenceRate: 0,
-      },
+    "id": 3,
+    "name": "战士本能",
+    "des": "生命值较低时触发的求生本能爆发。生命值少于0.35时每回合造成15威力伤害",
+    "condition": {
+      "type": "<",
+      "selfCondition": {
+        "health": 0,
+        "healthRate": 0.35,
+        "attack": 0,
+        "defence": 0,
+        "attackRate": 0,
+        "defenceRate": 0
+      }
     },
-    power: 15,
-    status: [],
-    changeValue: [],
-    accuracy: 0.9,
+    "power": 15,
+    "status": [],
+    "changeValue": [],
+    "accuracy": 0.9
   },
   {
-    id: 4,
-    name: "精准时机",
-    des: "每2回合有40%概率触发一次强化攻击20点。",
-    condition: {
-      type: ">=",
-      interval: 2,
-      dice: 0.4,
+    "id": 4,
+    "name": "精准时机",
+    "des": "每2回合有40%概率触发一次强化攻击20点。",
+    "condition": {
+      "type": ">=",
+      "interval": 2,
+      "dice": 0.4
     },
-    power: 20,
-    status: [],
-    changeValue: [],
-    accuracy: 0.95,
+    "power": 20,
+    "status": [],
+    "changeValue": [],
+    "accuracy": 0.95
   },
   {
-    id: 5,
-    name: "压制攻击",
-    des: "敌方生命比例较高时，额外伤害更容易触发。",
-    condition: {
-      type: ">",
-      enemyCondition: {
-        health: 0,
-        healthRate: 0.7,
-        attack: 0,
-        defence: 0,
-        attackRate: 0,
-        defenceRate: 0,
-      },
+    "id": 5,
+    "name": "压制攻击",
+    "des": "敌方生命比例较高时，额外伤害更容易触发。",
+    "condition": {
+      "type": ">",
+      "enemyCondition": {
+        "health": 0,
+        "healthRate": 0.7,
+        "attack": 0,
+        "defence": 0,
+        "attackRate": 0,
+        "defenceRate": 0
+      }
     },
-    power: 18,
-    status: [],
-    changeValue: [],
-    accuracy: 1,
+    "power": 18,
+    "status": [],
+    "changeValue": [],
+    "accuracy": 1
   },
   {
-    id: 7,
-    name: "破甲专注",
-    des: "每3回合有概率触发：削弱敌方防御。",
-    condition: {
-      type: ">=",
-      interval: 3,
-      dice: 0.6,
+    "id": 7,
+    "name": "破甲专注",
+    "des": "每3回合有概率触发：削弱敌方防御。",
+    "condition": {
+      "type": ">=",
+      "interval": 3,
+      "dice": 0.6
     },
-    power: 0,
-    status: [],
-    changeValue: [{ self: false, name: "defence", value: 5 }],
-    accuracy: 0.85,
+    "power": 0,
+    "status": [],
+    "changeValue": [
+      {
+        "self": false,
+        "name": "defence",
+        "value": 5
+      }
+    ],
+    "accuracy": 0.85
   },
   {
-    id: 8,
-    name: "防御反射",
-    des: "生命比例低于40%时触发：小幅提升防御。",
-    condition: {
-      type: "<",
-      selfCondition: {
-        health: 0,
-        healthRate: 0.4,
-        attack: 0,
-        defence: 0,
-        attackRate: 0,
-        defenceRate: 0,
-      },
+    "id": 8,
+    "name": "防御反射",
+    "des": "生命比例低于40%时触发：小幅提升防御。",
+    "condition": {
+      "type": "<",
+      "selfCondition": {
+        "health": 0,
+        "healthRate": 0.4,
+        "attack": 0,
+        "defence": 0,
+        "attackRate": 0,
+        "defenceRate": 0
+      }
     },
-    power: 0,
-    status: [],
-    changeValue: [{ self: true, name: "defence", value: 6 }],
-    accuracy: 1,
+    "power": 0,
+    "status": [],
+    "changeValue": [
+      {
+        "self": true,
+        "name": "defence",
+        "value": 6
+      }
+    ],
+    "accuracy": 1
   },
   {
-    id: 9,
-    name: "坚韧意志",
-    des: "每3回合有较高概率触发：短时间减少所受伤害。",
-    condition: {
-      type: ">=",
-      interval: 3,
-      dice: 0.6,
+    "id": 9,
+    "name": "坚韧意志",
+    "des": "每3回合有较高概率触发：短时间减少所受伤害。",
+    "condition": {
+      "type": ">=",
+      "interval": 3,
+      "dice": 0.6
     },
-    power: 0,
-    status: [{ name: "armor", round: 2, value: 10 }],
-    changeValue: [],
-    accuracy: 1,
-    putStatus: [{ name: "damage", round: 2, value: -4 }],
+    "power": 0,
+    "status": [
+      {
+        "name": "armor",
+        "round": 2,
+        "value": 10
+      }
+    ],
+    "changeValue": [],
+    "accuracy": 1,
+    "putStatus": [
+      {
+        "name": "damage",
+        "round": 2,
+        "value": -4
+      }
+    ]
   },
   {
-    id: 10,
-    name: "临危护甲",
-    des: "生命比例低于35%时触发：获得短护甲以提高生存。",
-    condition: {
-      type: "<",
-      selfCondition: {
-        health: 0,
-        healthRate: 0.35,
-        attack: 0,
-        defence: 0,
-        attackRate: 0,
-        defenceRate: 0,
-      },
+    "id": 10,
+    "name": "临危护甲",
+    "des": "生命比例低于35%时触发：获得短护甲以提高生存。",
+    "condition": {
+      "type": "<",
+      "selfCondition": {
+        "health": 0,
+        "healthRate": 0.35,
+        "attack": 0,
+        "defence": 0,
+        "attackRate": 0,
+        "defenceRate": 0
+      }
     },
-    power: 0,
-    status: [{ name: "armor", round: 1, value: 5 }],
-    changeValue: [],
-    accuracy: 1,
-    putStatus: [{ name: "armor", round: 2, value: 6 }],
+    "power": 0,
+    "status": [
+      {
+        "name": "armor",
+        "round": 1,
+        "value": 5
+      }
+    ],
+    "changeValue": [],
+    "accuracy": 1,
+    "putStatus": [
+      {
+        "name": "armor",
+        "round": 2,
+        "value": 6
+      }
+    ]
   },
   {
-    id: 11,
-    name: "战斗回复",
-    des: "每回合稳定回复少量生命值。",
-    condition: {
-      type: ">=",
-      interval: 1,
-      dice: 1,
+    "id": 11,
+    "name": "战斗回复",
+    "des": "每回合稳定回复少量生命值。",
+    "condition": {
+      "type": ">=",
+      "interval": 1,
+      "dice": 1
     },
-    power: 0,
-    status: [],
-    changeValue: [{ self: true, name: "hp", value: 3 }],
-    accuracy: 1,
+    "power": 0,
+    "status": [],
+    "changeValue": [
+      {
+        "self": true,
+        "name": "hp",
+        "value": 3
+      }
+    ],
+    "accuracy": 1
   },
   {
-    id: 13,
-    name: "二次呼吸",
-    des: "每4回合触发：回复更多生命值。",
-    condition: {
-      type: ">=",
-      interval: 4,
-      dice: 1,
+    "id": 13,
+    "name": "二次呼吸",
+    "des": "每4回合触发：回复更多生命值。",
+    "condition": {
+      "type": ">=",
+      "interval": 4,
+      "dice": 1
     },
-    power: 0,
-    status: [],
-    changeValue: [{ self: true, name: "hp", value: 20 }],
-    accuracy: 1,
+    "power": 0,
+    "status": [],
+    "changeValue": [
+      {
+        "self": true,
+        "name": "hp",
+        "value": 20
+      }
+    ],
+    "accuracy": 1
   },
   {
-    id: 14,
-    name: "压迫气场",
-    des: "每3回合有概率触发：使敌方进入弱化状态。",
-    condition: {
-      type: ">=",
-      interval: 3,
-      dice: 0.6,
+    "id": 14,
+    "name": "压迫气场",
+    "des": "每3回合有概率触发：使敌方进入弱化状态。",
+    "condition": {
+      "type": ">=",
+      "interval": 3,
+      "dice": 0.6
     },
-    power: 0,
-    status: [{ name: "weak", round: 2, rate: 0.7 }],
-    changeValue: [],
-    accuracy: 0.85,
-    putStatus: [{ name: "weak", round: 2, rate: 0.8 }],
+    "power": 0,
+    "status": [
+      {
+        "name": "weak",
+        "round": 2,
+        "rate": 0.7
+      }
+    ],
+    "changeValue": [],
+    "accuracy": 0.85,
+    "putStatus": [
+      {
+        "name": "weak",
+        "round": 2,
+        "rate": 0.8
+      }
+    ]
   },
   {
-    id: 15,
-    name: "迟缓打击",
-    des: "每回合有概率触发：降低敌方速度。",
-    condition: {
-      type: ">=",
-      interval: 1,
-      dice: 0.35,
+    "id": 15,
+    "name": "迟缓打击",
+    "des": "每回合有概率触发：降低敌方速度。",
+    "condition": {
+      "type": ">=",
+      "interval": 1,
+      "dice": 0.35
     },
-    power: 0,
-    status: [],
-    changeValue: [{ self: false, name: "speed", value: 0.5 }],
-    accuracy: 0.8,
+    "power": 0,
+    "status": [],
+    "changeValue": [
+      {
+        "self": false,
+        "name": "speed",
+        "value": 0.5
+      }
+    ],
+    "accuracy": 0.8
   },
   {
-    id: 16,
-    name: "攻势削弱",
-    des: "每2回合有概率触发：降低敌方攻击力。",
-    condition: {
-      type: ">=",
-      interval: 2,
-      dice: 0.35,
+    "id": 16,
+    "name": "攻势削弱",
+    "des": "每2回合有概率触发：降低敌方攻击力。",
+    "condition": {
+      "type": ">=",
+      "interval": 2,
+      "dice": 0.35
     },
-    power: 0,
-    status: [],
-    changeValue: [{ self: false, name: "attack", value: 3 }],
-    accuracy: 0.85,
+    "power": 0,
+    "status": [],
+    "changeValue": [
+      {
+        "self": false,
+        "name": "attack",
+        "value": 3
+      }
+    ],
+    "accuracy": 0.85
   },
   {
-    id: 18,
-    name: "身法",
-    des: "每回合有概率触发：提高闪避能力。",
-    condition: {
-      type: ">=",
-      interval: 1,
-      dice: 0.25,
+    "id": 18,
+    "name": "身法",
+    "des": "每回合有概率触发：提高闪避能力。",
+    "condition": {
+      "type": ">=",
+      "interval": 1,
+      "dice": 0.25
     },
-    power: 0,
-    status: [],
-    changeValue: [{ self: true, name: "missRate", rate: 0.04 }],
-    accuracy: 1,
+    "power": 0,
+    "status": [],
+    "changeValue": [
+      {
+        "self": true,
+        "name": "missRate",
+        "rate": 0.04
+      }
+    ],
+    "accuracy": 1
   },
   {
-    id: 20,
-    name: "致命直觉",
-    des: "每回合有概率触发：小幅提升暴击率。",
-    condition: {
-      type: ">=",
-      interval: 1,
-      dice: 0.25,
+    "id": 20,
+    "name": "致命直觉",
+    "des": "每回合有概率触发：小幅提升暴击率。",
+    "condition": {
+      "type": ">=",
+      "interval": 1,
+      "dice": 0.25
     },
-    power: 0,
-    status: [],
-    changeValue: [{ self: true, name: "criticalRate", rate: 0.08 }],
-    accuracy: 1,
+    "power": 0,
+    "status": [],
+    "changeValue": [
+      {
+        "self": true,
+        "name": "criticalRate",
+        "rate": 0.08
+      }
+    ],
+    "accuracy": 1
   },
   {
-    id: 21,
-    name: "泼水冷静",
-    des: "使对方保持冷静，降低对方暴击率",
-    condition: {
-      type: "<",
-      round: 2,
-      dice: 1,
+    "id": 21,
+    "name": "泼水冷静",
+    "des": "使对方保持冷静，降低对方暴击率",
+    "condition": {
+      "type": "<",
+      "round": 2,
+      "dice": 1
     },
-    power: 0,
-    status: [],
-    changeValue: [{ self: false, name: "criticalRate", rate: 0.05 }],
-    accuracy: 1,
-  },
+    "power": 0,
+    "status": [],
+    "changeValue": [
+      {
+        "self": false,
+        "name": "criticalRate",
+        "rate": 0.05
+      }
+    ],
+    "accuracy": 1
+  }
 ];

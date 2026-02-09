@@ -297,7 +297,7 @@
   {
     "id": 17,
     "name": "以太护盾【圣骑士】",
-    "des": "召唤魔法屏障，使防御力提升5%3回合，并提升5点防御。",
+    "des": "召唤魔法屏障，使防御力提升5%3回合，并提升2点防御。",
     "power": 0,
     "suckBloodRate": 0,
     "putStatus": [
@@ -311,10 +311,10 @@
       {
         "self": true,
         "name": "defence",
-        "value": 5
+        "value": 2
       }
     ],
-    "accuracy": 0.85,
+    "accuracy": 0.75,
     "criticalRate": 0
   },
   {
@@ -431,7 +431,7 @@
         "value": 10
       }
     ],
-    "accuracy": 60,
+    "accuracy": 1,
     "criticalRate": 0
   },
   {
