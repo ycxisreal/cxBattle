@@ -87,6 +87,8 @@ const calculateDamage = (attacker, defender, rawSkill, isStrength = false) => {
       des: "伤害为0",
     };
   }
+
+  // 命中判定（保持不变）
   const missRate = getRandom(defender.missRate, defender.randomRate);
   if (Math.random() <= missRate || Math.random() >= skill.accuracy) {
     return {
@@ -97,25 +99,53 @@ const calculateDamage = (attacker, defender, rawSkill, isStrength = false) => {
       }攻击`,
     };
   }
+
+  // 暴击判定（保持不变）
   const criticalRate = getRandom(attacker.criticalRate, attacker.randomRate);
   const criticalValue = getRandom(attacker.criticalHurtRate, attacker.randomRate);
   const criticalHit =
     Math.random() <= criticalRate || Math.random() <= skill.criticalRate;
+
+  // =========================
+  // 核心：由“攻击-防御”改为“比例减伤”
+  // 保持每个随机点与状态处理存在且位置基本一致：
+  //  - random(skill.power) 仍然取一次
+  //  - random(statusAtk(attacker.attack)) 仍然取一次
+  //  - random(statusDef(defender.defence)) 仍然取一次
+  //  - max(0, damage)、random(damage)、random(statusSp)、暴击倍率都保留
+  // =========================
+
   let damage = 0;
-  damage += getRandom(skill.power, attacker.randomRate);
-  damage += getRandom(
+
+  // 攻击侧（原先是 +power +atk）
+  const powerPart = getRandom(skill.power, attacker.randomRate);
+  const atkPart = getRandom(
     calculateStatus(attacker, "atk", attacker.attack),
     attacker.randomRate
   );
-  damage -= getRandom(
+  const attackTotal = powerPart + atkPart;
+
+  // 防御侧（原先是 -def）
+  const defPart = getRandom(
     calculateStatus(defender, "def", defender.defence),
     defender.randomRate
   );
+
+  // 比例减伤：mul = K/(K+def)
+  // K 为内部常量，不新增/不减少数据结构
+  const K = 50;
+  const safeDef = Math.max(0, defPart); // 兼容防御为负的情况（你允许 defence 最低到 -100）
+  const mitigationMul = K / (K + safeDef);
+
+  damage = attackTotal * mitigationMul;
+
+  // 保留原来的截断、随机、状态倍率、暴击（顺序保持一致）
   damage = Math.max(0, damage);
   damage = getRandom(damage, attacker.randomRate);
   damage *= getRandom(calculateStatus(attacker, "sp"), attacker.randomRate);
   if (criticalHit) damage *= criticalValue;
 
+  // 吸血（保持不变）
   let heal = 0;
   if (skill.suckBloodRate) {
     heal = damage * skill.suckBloodRate;
@@ -124,13 +154,13 @@ const calculateDamage = (attacker, defender, rawSkill, isStrength = false) => {
 
   const text = isStrength
     ? `${attacker.owner}的${attacker.name}被动特长对${defender.owner}的${
-        defender.name
-      }造成${Math.floor(damage)}点伤害`
+      defender.name
+    }造成${Math.floor(damage)}点伤害`
     : `${attacker.owner}的${attacker.name}对${defender.owner}的${
-        defender.name
-      }造成${Math.floor(damage)}点伤害${
-        criticalHit ? "（暴击）" : ""
-      }${heal > 0 ? `（吸血${Math.floor(heal)}）` : ""}`;
+      defender.name
+    }造成${Math.floor(damage)}点伤害${
+      criticalHit ? "（暴击）" : ""
+    }${heal > 0 ? `（吸血${Math.floor(heal)}）` : ""}`;
 
   return {
     damage,
@@ -138,6 +168,7 @@ const calculateDamage = (attacker, defender, rawSkill, isStrength = false) => {
     des: text,
   };
 };
+
 //todo 目前施加状态的对象都是默认的，比如weak就是默认对方，damage默认是自己，后期需要修改一下数据结构，改为对象可以为双方
 const applyStatus = (attacker, defender, rawSkill, isStrength = false) => {
   const skill = normalizeSkill(rawSkill);

@@ -490,6 +490,8 @@ h2 {
 }
 
 .modal-body {
+  overflow-y: scroll;
+  max-height: 80vh;
   margin-top: 12px;
   display: grid;
   gap: 12px;

@@ -1,5 +1,6 @@
 ﻿<script setup>
 import { computed, ref, watchEffect } from "vue";
+import { Refresh } from "@element-plus/icons-vue";
 import BattleLog from "./components/BattleLog.vue";
 import CustomDataPanel from "./components/CustomDataPanel.vue";
 import SkillCard from "./components/SkillCard.vue";
@@ -11,7 +12,10 @@ const {
   state,
   playerSkills,
   availableUnits,
+  difficultyOptions,
   resetBattle,
+  setDifficulty,
+  toggleChainMode,
   chooseSkill,
   toggleRandomize,
   startBattleWithSelection,
@@ -33,6 +37,23 @@ const sidebarTabs = [
 ];
 const activeSidebarId = ref("skill-formula");
 const showFormulaModal = ref(false);
+const showDifficultyModal = ref(false);
+const difficultyDescriptions = {
+  normal: "普通：敌人使用默认数值，不额外强化。",
+  hard: "困难：生命、攻击提升至 1.2 倍，防御提升至 1.05 倍。",
+  extreme:
+    "极难：生命和攻击 1.5 倍，防御 1.05 倍，每回合额外回复 3 点生命，闪避率和暴击率各 +5%。",
+  expert:
+    "专家：生命和攻击 1.7 倍，防御 1.15 倍，每回合额外回复 7 点生命，闪避率和暴击率各 +8%，并随机增加 1 个未拥有被动特长。",
+  inferno:
+    "炼狱：生命和攻击 2.0 倍，防御 1.15 倍，每回合额外回复 12 点生命，闪避率和暴击率各 +10%，并随机增加 1 个未拥有被动特长。",
+};
+
+// 当前难度文本与样式标记。
+const currentDifficultyLabel = computed(
+  () => difficultyOptions.find((item) => item.key === state.difficulty)?.label || "普通"
+);
+const currentDifficultyTone = computed(() => `tone-${state.difficulty}`);
 
 const selectedUnit = computed(() =>
   availableUnits.value.find((unit) => unit.id === selectedUnitId.value)
@@ -157,6 +178,10 @@ const handleSidebarSelect = (id) => {
 const closeFormulaModal = () => {
   showFormulaModal.value = false;
 };
+
+const closeDifficultyModal = () => {
+  showDifficultyModal.value = false;
+};
 </script>
 
 <template>
@@ -262,6 +287,26 @@ const closeFormulaModal = () => {
           {{ tab.title }}
         </button>
       </div>
+      <div class="difficulty-quick">
+        <p class="difficulty-current">
+          当前难度：
+          <span class="difficulty-badge" :class="currentDifficultyTone">{{ currentDifficultyLabel }}</span>
+        </p>
+        <button
+          class="ghost difficulty-open-btn"
+          :class="currentDifficultyTone"
+          type="button"
+          @click="showDifficultyModal = true"
+        >
+          选择难度
+        </button>
+      </div>
+      <div class="chain-quick">
+        <button class="ghost chain-open-btn" type="button" @click="toggleChainMode">
+          {{ state.chainMode ? "关闭连战模式" : "开启连战模式" }}
+        </button>
+        <p v-if="state.chainMode" class="enemy-index-text">当前第 {{ state.enemyIndex }} 个敌人</p>
+      </div>
     </aside>
 
     <section v-if="state.phase === 'battle'" class="arena">
@@ -350,6 +395,55 @@ const closeFormulaModal = () => {
           <p class="formula note">
             说明：随机(x) 表示在随机倍率区间内取值；状态倍率来自强/弱状态，默认 1。
           </p>
+        </div>
+      </div>
+    </div>
+
+    <div
+      v-if="showDifficultyModal"
+      class="modal-backdrop"
+      @click.self="closeDifficultyModal"
+    >
+      <div class="modal">
+        <div class="modal-header">
+          <h4>敌人难度设置</h4>
+          <button class="ghost" type="button" @click="closeDifficultyModal">
+            关闭
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="difficulty-panel">
+            <div class="difficulty-options">
+              <label
+                v-for="option in difficultyOptions"
+                :key="option.key"
+                class="difficulty-option"
+              >
+                <input
+                  type="radio"
+                  name="enemy-difficulty"
+                  :value="option.key"
+                  :checked="state.difficulty === option.key"
+                  @change="setDifficulty(option.key)"
+                />
+                <span>{{ option.label }}</span>
+              </label>
+            </div>
+            <p class="difficulty-current">
+              当前难度：
+              <span class="difficulty-badge" :class="currentDifficultyTone">{{ currentDifficultyLabel }}</span>
+            </p>
+            <div class="difficulty-desc-list">
+              <p
+                v-for="option in difficultyOptions"
+                :key="`desc-${option.key}`"
+                class="difficulty-desc"
+                :class="{ active: state.difficulty === option.key }"
+              >
+                {{ difficultyDescriptions[option.key] }}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -462,8 +556,9 @@ const closeFormulaModal = () => {
 
     <BattleLog v-if="state.phase === 'battle'" :entries="state.log">
       <template #actions>
-        <button class="ghost" type="button" @click="handleResetBattle">
-          重置战斗
+        <button class="ghost reset-enemy-btn" type="button" @click="handleResetBattle">
+          <el-icon><Refresh /></el-icon>
+          <span>刷新敌人</span>
         </button>
         <button class="ghost" type="button" @click="toggleRandomize">
           {{ state.randomize ? "关闭属性浮动" : "开启属性浮动" }}
@@ -576,6 +671,25 @@ h1 {
   gap: 8px;
 }
 
+.difficulty-quick {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chain-quick {
+  margin-top: 2px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
 .sidebar-tab {
   text-align: left;
   padding: 10px 12px;
@@ -660,6 +774,178 @@ h1 {
 
 .formula.note {
   color: rgba(255, 255, 255, 0.6);
+}
+
+.difficulty-panel {
+  margin-top: 8px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.difficulty-panel h5 {
+  margin: 0 0 10px;
+  font-size: 15px;
+}
+
+.difficulty-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 8px;
+}
+
+.difficulty-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.difficulty-option input {
+  accent-color: #4ad7bf;
+}
+
+.difficulty-current {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.difficulty-open-btn {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 9px 14px;
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #101522;
+  background: linear-gradient(135deg, #a1f7ff, #4ad7bf);
+  box-shadow: 0 8px 18px rgba(70, 220, 205, 0.35);
+  animation: difficultyBreath 1.8s ease-in-out infinite;
+}
+
+.difficulty-open-btn:hover {
+  transform: translateY(-1px);
+  opacity: 1;
+  animation-play-state: paused;
+}
+
+@keyframes difficultyBreath {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 8px 18px rgba(70, 220, 205, 0.35);
+  }
+  50% {
+    transform: scale(1.04);
+    box-shadow: 0 12px 24px rgba(70, 220, 205, 0.48);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 8px 18px rgba(70, 220, 205, 0.35);
+  }
+}
+
+.difficulty-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 58px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.tone-normal {
+  color: #d8f3ff;
+  border-color: rgba(142, 226, 255, 0.6);
+  background: rgba(96, 190, 230, 0.22);
+}
+
+.tone-hard {
+  color: #ffe8bf;
+  border-color: rgba(255, 199, 106, 0.62);
+  background: rgba(229, 158, 54, 0.24);
+}
+
+.tone-extreme {
+  color: #ffd6be;
+  border-color: rgba(255, 154, 97, 0.66);
+  background: rgba(230, 112, 55, 0.25);
+}
+
+.tone-expert {
+  color: #ffd7f6;
+  border-color: rgba(255, 127, 215, 0.68);
+  background: rgba(199, 70, 166, 0.28);
+}
+
+.tone-inferno {
+  color: #ffd5d0;
+  border-color: rgba(255, 93, 93, 0.72);
+  background: rgba(200, 35, 52, 0.3);
+}
+
+.difficulty-open-btn.tone-normal {
+  color: #0e1a25;
+  background: linear-gradient(135deg, #b4f2ff, #6fd5ff);
+  box-shadow: 0 8px 18px rgba(72, 182, 238, 0.35);
+}
+
+.difficulty-open-btn.tone-hard {
+  color: #231300;
+  background: linear-gradient(135deg, #ffd89f, #ffb24d);
+  box-shadow: 0 8px 18px rgba(255, 165, 56, 0.36);
+}
+
+.difficulty-open-btn.tone-extreme {
+  color: #2a0f00;
+  background: linear-gradient(135deg, #ffc49d, #ff7e4a);
+  box-shadow: 0 8px 18px rgba(247, 108, 60, 0.4);
+}
+
+.difficulty-open-btn.tone-expert {
+  color: #2b0c22;
+  background: linear-gradient(135deg, #ffb3ef, #e86dc8);
+  box-shadow: 0 8px 18px rgba(214, 81, 178, 0.4);
+}
+
+.difficulty-open-btn.tone-inferno {
+  color: #2b0606;
+  background: linear-gradient(135deg, #ff9e8f, #ff4343);
+  box-shadow: 0 8px 18px rgba(232, 64, 64, 0.42);
+}
+
+.chain-open-btn {
+  border-radius: 10px;
+  font-weight: 700;
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.difficulty-desc-list {
+  display: grid;
+  gap: 6px;
+}
+
+.difficulty-desc {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.58);
+}
+
+.difficulty-desc.active {
+  color: rgba(74, 215, 191, 0.95);
 }
 
 .select {
@@ -934,6 +1220,33 @@ h1 {
   margin: 0;
   font-size: 13px;
   color: rgba(255, 255, 255, 0.6);
+}
+
+.enemy-index-text {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.reset-enemy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  font-size: 14px;
+  color: #1c0f00;
+  border: none;
+  background: linear-gradient(135deg, #ffd26a, #ff8f4a);
+  box-shadow: 0 10px 24px rgba(255, 146, 76, 0.45);
+}
+
+.reset-enemy-btn .el-icon {
+  font-size: 16px;
+}
+
+.reset-enemy-btn:hover {
+  opacity: 1;
+  transform: translateY(-1px);
 }
 
 @media (max-width: 1024px) {
