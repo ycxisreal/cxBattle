@@ -6,6 +6,8 @@ import {
   units as runtimeUnits,
   skills as runtimeSkills,
   strengths as runtimeStrengths,
+  blessings as runtimeBlessings,
+  equipmentAffixes as runtimeEquipmentAffixes,
   isElectron,
   updateRuntimeData,
 } from "../game/data/runtimeData.js";
@@ -379,6 +381,8 @@ const syncData = async () => {
     units: cloneData(customData.units),
     skills: cloneData(customData.skills),
     strengths: cloneData(customData.strengths),
+    blessings: cloneData(runtimeBlessings),
+    equipmentAffixes: cloneData(runtimeEquipmentAffixes),
   };
   updateRuntimeData(payload);
   if (!isElectronEnv) return;

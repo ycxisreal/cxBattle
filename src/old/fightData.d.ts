@@ -129,3 +129,46 @@ type EnemyCondition = {
   attackRate: number, // 攻击比例条件
   defenceRate: number, // 防御比例条件
 }
+
+type BlessingQuality = 'A' | 'B' | 'C'
+
+type BlessingDef = {
+  id: number, // 祝福ID
+  name: string, // 祝福名称
+  quality: BlessingQuality, // 祝福品质
+  cost: number, // 消耗点数
+  desc: string, // 祝福描述
+  implKey: string, // 实现映射键
+  repeatable?: boolean, // 是否可重复获取
+  maxStack?: number, // 最大可获取次数（层数）
+  tags?: string[], // 分类标签
+}
+
+type BlessingInstance = {
+  id: number, // 对应 BlessingDef.id
+  stack?: number, // 叠加层数
+  cooldown?: number, // 冷却
+  state?: Record<string, any>, // 运行时状态
+}
+
+type EquipmentModifier = {
+  key: string, // 属性键
+  mode: 'add' | 'mul', // 加法/乘法修正
+  value: number, // 修正值
+}
+
+type EquipmentInstance = {
+  id: string | number, // 装备实例ID
+  quality: BlessingQuality, // 装备品质
+  name: string, // 装备名称
+  cost: number, // 装备消耗
+  modifiers: EquipmentModifier[], // 词条修正
+}
+
+type DraftItem = {
+  draftId: string, // 草案项ID
+  type: 'blessing' | 'equipment', // 草案项类型
+  quality: BlessingQuality, // 品质
+  cost: number, // 消耗
+  payload: BlessingDef | EquipmentInstance, // 实际数据载荷
+}

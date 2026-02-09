@@ -3,13 +3,13 @@ import { strengths } from "../data/strengths.js";
 const ATTRIBUTE_LIMITS = {
   hpCount: { min: 30 },
   hp: { min: 0 },
-  defence: { min: -100, max: 100 },
-  attack: { min: 1, max: 100 },
+  defence: { min: -100, max: 200 },
+  attack: { min: 1, max: 200 },
   speed: { min: 0, max: 10 },
   criticalRate: { min: 0, max: 1 },
-  missRate: { min: 0, max: 0.6 },
+  missRate: { min: 0, max: 0.5 },
   criticalHurtRate: { min: 1 },
-  healPerRound: { min: 0, max: 10 },
+  healPerRound: { min: 0},
 };
 
 const getRandom = (originValue, rate) => {
@@ -22,6 +22,12 @@ const clamp = (value, min, max) => {
   if (typeof min === "number") value = Math.max(value, min);
   if (typeof max === "number") value = Math.min(value, max);
   return value;
+};
+
+// 触发战斗事件钩子，统一处理 hookBus 的可选存在。
+const emitHook = (hookBridge, eventName, ctx) => {
+  if (!hookBridge?.hookBus?.emit) return;
+  hookBridge.hookBus.emit(eventName, ctx);
 };
 
 export const createUnitInstance = (base, owner) => {
@@ -78,7 +84,13 @@ const calculateStatus = (unit, attribute, baseValue = 1) => {
   return baseValue;
 };
 
-const calculateDamage = (attacker, defender, rawSkill, isStrength = false) => {
+const calculateDamage = (
+  attacker,
+  defender,
+  rawSkill,
+  isStrength = false,
+  beforeDamageHook = null
+) => {
   const skill = normalizeSkill(rawSkill);
   if (!skill.power) {
     return {
@@ -144,6 +156,19 @@ const calculateDamage = (attacker, defender, rawSkill, isStrength = false) => {
   damage = getRandom(damage, attacker.randomRate);
   damage *= getRandom(calculateStatus(attacker, "sp"), attacker.randomRate);
   if (criticalHit) damage *= criticalValue;
+  if (typeof beforeDamageHook === "function") {
+    const nextDamage = beforeDamageHook({
+      attacker,
+      defender,
+      skill,
+      damage,
+      isStrength,
+      criticalHit,
+    });
+    if (Number.isFinite(nextDamage)) {
+      damage = Math.max(0, nextDamage);
+    }
+  }
 
   // 吸血（保持不变）
   let heal = 0;
@@ -334,7 +359,7 @@ const applyChangeValue = (attacker, defender, rawSkill) => {
   return logs;
 };
 
-const executeStrength = (attacker, defender, round, addLog, onEvent) => {
+const executeStrength = (attacker, defender, round, addLog, onEvent, hookBridge) => {
   for (const strengthId of attacker.strength || []) {
     const strength = strengths.find((item) => item.id === strengthId);
     if (!strength) continue;
@@ -351,8 +376,33 @@ const executeStrength = (attacker, defender, round, addLog, onEvent) => {
       criticalRate: 0,
     };
     if (strength.power) {
-      const msg = calculateDamage(attacker, defender, skill, true);
+      const msg = calculateDamage(attacker, defender, skill, true, (ctx) => {
+        const payload = {
+          session: hookBridge?.getSession?.(),
+          round,
+          actor: attacker,
+          target: defender,
+          skill,
+          damage: ctx.damage,
+          isStrength: true,
+          log: addLog,
+          meta: {},
+        };
+        emitHook(hookBridge, "onBeforeDamage", payload);
+        return payload.damage;
+      });
       defender.hp -= msg.damage;
+      emitHook(hookBridge, "onAfterDamage", {
+        session: hookBridge?.getSession?.(),
+        round,
+        actor: attacker,
+        target: defender,
+        skill,
+        damage: msg.damage,
+        isStrength: true,
+        log: addLog,
+        meta: {},
+      });
       if (msg.damage > 0 && onEvent) {
         onEvent({ type: "hit" });
       }
@@ -471,19 +521,54 @@ export const executeSkill = (
   skill,
   round,
   addLog,
-  onEvent
+  onEvent,
+  hookBridge
 ) => {
   if (!skill) {
     addLog(`${attacker.owner}没有可用招式`);
     return;
   }
   addLog(`${attacker.owner}的${attacker.name}使用了${skill.name}`);
+  emitHook(hookBridge, "onBeforeAction", {
+    session: hookBridge?.getSession?.(),
+    round,
+    actor: attacker,
+    target: defender,
+    skill,
+    log: addLog,
+    meta: {},
+  });
   let isMissed = false;
 
   if (skill.power) {
-    const damageInfo = calculateDamage(attacker, defender, skill);
+    const damageInfo = calculateDamage(attacker, defender, skill, false, (ctx) => {
+      const payload = {
+        session: hookBridge?.getSession?.(),
+        round,
+        actor: attacker,
+        target: defender,
+        skill,
+        damage: ctx.damage,
+        isStrength: false,
+        log: addLog,
+        meta: {},
+      };
+      emitHook(hookBridge, "onBeforeDamage", payload);
+      return payload.damage;
+    });
     addLog(damageInfo.des);
     defender.hp -= damageInfo.damage;
+    emitHook(hookBridge, "onAfterDamage", {
+      session: hookBridge?.getSession?.(),
+      round,
+      actor: attacker,
+      target: defender,
+      skill,
+      damage: damageInfo.damage,
+      isStrength: false,
+      log: addLog,
+      meta: {},
+    });
     if (damageInfo.damage > 0 && onEvent) {
       onEvent({ type: "hit" });
     }
@@ -512,7 +597,7 @@ export const executeSkill = (
     attacker.hpCount
   );
   if (attacker.strength?.length) {
-    executeStrength(attacker, defender, round, addLog, onEvent);
+    executeStrength(attacker, defender, round, addLog, onEvent, hookBridge);
   }
 };
 

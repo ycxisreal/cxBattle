@@ -1,5 +1,6 @@
 ﻿<script setup>
 import { computed, ref, watchEffect } from "vue";
+import { ElMessage } from "element-plus";
 import { Refresh } from "@element-plus/icons-vue";
 import BattleLog from "./components/BattleLog.vue";
 import CustomDataPanel from "./components/CustomDataPanel.vue";
@@ -13,6 +14,7 @@ const {
   playerSkills,
   availableUnits,
   difficultyOptions,
+  pointsRemaining,
   resetBattle,
   setDifficulty,
   toggleChainMode,
@@ -20,6 +22,10 @@ const {
   toggleRandomize,
   startBattleWithSelection,
   backToSelect,
+  togglePreDraftItem,
+  refreshPreDraftCandidates,
+  confirmPreDraft,
+  chooseMidDraftBlessing,
 } = useBattle();
 
 const selectedUnitId = ref(null);
@@ -182,6 +188,53 @@ const closeFormulaModal = () => {
 const closeDifficultyModal = () => {
   showDifficultyModal.value = false;
 };
+
+const isPreDraftSelected = (draftId) => state.draft.selectedPreIds.includes(draftId);
+const toggleDraftCandidate = (draftId) => {
+  const result = togglePreDraftItem(draftId);
+  if (result?.ok === false && result.message) {
+    ElMessage.warning(result.message);
+  }
+};
+const handleConfirmPreDraft = () => confirmPreDraft();
+const handleRefreshPreDraft = () => refreshPreDraftCandidates();
+const handlePickMidDraftBlessing = (blessingId) => chooseMidDraftBlessing(blessingId);
+const getQualityClass = (quality) => `quality-${String(quality || "C").toLowerCase()}`;
+const getDraftEffectText = (item) =>
+  item.type === "blessing"
+    ? item.payload.desc || "无效果描述"
+    : `词条：${(item.payload.modifiers || [])
+      .map((m) => `${m.key}${m.mode === "mul" ? "x" : "+"}${m.value}`)
+      .join("，") || "无"}`;
+const getEquipmentEffectText = (item) =>
+  (item.modifiers || [])
+    .map((m) => `${m.key}${m.mode === "mul" ? "x" : "+"}${m.value}`)
+    .join("，") || "无词条";
+const getOwnedBlessingStack = (blessingId) =>
+  Number(state.blessings.find((item) => item.id === blessingId)?.stack || 0);
+const getBlessingMaxStack = (blessing) => {
+  const parsedMaxStack = Number(blessing?.maxStack);
+  if (Number.isFinite(parsedMaxStack) && parsedMaxStack > 0) {
+    return Math.max(1, Math.floor(parsedMaxStack));
+  }
+  return 1;
+};
+const getBlessingStackText = (blessing) => {
+  const owned = getOwnedBlessingStack(blessing.id);
+  const max = getBlessingMaxStack(blessing);
+  return `${owned}/${max}`;
+};
+const getBuildBlessingStackText = (blessing) => {
+  const now = Number(blessing?.stack || 1);
+  const max = getBlessingMaxStack(blessing);
+  return `${now}/${max}`;
+};
+
+const preDraftSelectedCost = computed(() =>
+  state.draft.preCandidates
+    .filter((item) => state.draft.selectedPreIds.includes(item.draftId))
+    .reduce((sum, item) => sum + Number(item.cost || 0), 0)
+);
 </script>
 
 <template>
@@ -309,6 +362,12 @@ const closeDifficultyModal = () => {
             <button class="ghost chain-open-btn" type="button" @click="toggleChainMode">
               {{ state.chainMode ? "关闭连战模式" : "开启连战模式" }}
             </button>
+            <div v-if="state.chainMode">
+              <div class="enemy-index-text">每击败 1 个敌人，下一名敌人额外获得：</div>
+              <div class="enemy-index-text">- 生命/攻击/防御倍率：+20%</div>
+              <div class="enemy-index-text">- 每回合回复：+1</div>
+              <div class="enemy-index-text">- 暴击伤害倍率：+10%</div>
+            </div>
             <p v-if="state.chainMode" class="enemy-index-text">当前第 {{ state.enemyIndex }} 个敌人</p>
           </div>
         </div>
@@ -330,6 +389,12 @@ const closeDifficultyModal = () => {
               <p>第 {{ state.round }} 回合</p>
               <span v-if="state.over" class="result">
                 {{ state.winner === "平局" ? "平局" : `${state.winner}获胜` }}
+              </span>
+              <span v-else-if="state.draft.prePending" class="result">
+                等待战前构筑确认
+              </span>
+              <span v-else-if="state.draft.midPending" class="result">
+                等待祝福三选一
               </span>
               <span v-else class="result">
                 {{ state.busy ? "行动结算中..." : "等待玩家选择招式" }}
@@ -386,7 +451,7 @@ const closeDifficultyModal = () => {
                 v-for="skill in visibleSkills"
                 :key="skill.id"
                 :skill="skill"
-                :disabled="state.over || state.busy"
+                :disabled="state.over || state.busy || state.draft.prePending || state.draft.midPending"
                 @click="chooseSkill(skill.id)"
               />
             </div>
@@ -434,7 +499,7 @@ const closeDifficultyModal = () => {
             v-if="state.player?.stopRound > 0 && !state.over"
             class="ghost skip"
             type="button"
-            :disabled="state.busy"
+            :disabled="state.busy || state.draft.prePending || state.draft.midPending"
             @click="skipRound"
           >
             跳过回合
@@ -463,10 +528,104 @@ const closeDifficultyModal = () => {
 
       <aside class="battle-side battle-side-right" aria-hidden="true">
         <div class="side-placeholder">
-          <p>右侧区域预留（后续可放战报、Buff列表或快捷信息）</p>
+          <p class="side-title">当前构筑</p>
+          <p class="side-sub">祝福（{{ state.blessings.length }}）</p>
+          <ul class="build-list">
+            <li v-for="item in state.blessings" :key="`blessing-${item.id}`">
+              <p class="build-name">
+                {{ item.name }} <small>层数 {{ getBuildBlessingStackText(item) }}</small>
+              </p>
+              <p class="build-effect">{{ item.desc || "无效果描述" }}</p>
+            </li>
+            <li v-if="!state.blessings.length">暂无</li>
+          </ul>
+          <p class="side-sub">装备（{{ state.equipments.length }}/2）</p>
+          <ul class="build-list">
+            <li v-for="item in state.equipments" :key="item.id">
+              <p class="build-name">{{ item.name }}</p>
+              <p class="build-effect">{{ getEquipmentEffectText(item) }}</p>
+            </li>
+            <li v-if="!state.equipments.length">暂无</li>
+          </ul>
         </div>
       </aside>
     </section>
+
+    <div
+      v-if="state.draft.prePending"
+      class="modal-backdrop"
+    >
+      <div class="modal draft-modal">
+        <div class="modal-header">
+          <h4>战前构筑（6选）</h4>
+        </div>
+        <div class="modal-body">
+          <p>总点数 {{ state.pointsTotal }}，已用 {{ state.pointsUsed }}，剩余 {{ pointsRemaining }}</p>
+          <div class="draft-cards">
+            <button
+              v-for="item in state.draft.preCandidates"
+              :key="item.draftId"
+              class="draft-card"
+              :class="[getQualityClass(item.quality), { active: isPreDraftSelected(item.draftId) }]"
+              type="button"
+              @click="toggleDraftCandidate(item.draftId)"
+            >
+              <p class="draft-type">{{ item.type === "blessing" ? "祝福" : "装备" }}</p>
+              <h4>{{ item.payload.name }}</h4>
+              <p class="draft-desc">{{ getDraftEffectText(item) }}</p>
+              <p class="draft-meta">
+                品质 {{ item.quality }} · 消耗 {{ item.cost }}
+                <span v-if="item.type === 'blessing'">
+                  · 层数 {{ getBlessingStackText(item.payload) }}
+                </span>
+              </p>
+            </button>
+          </div>
+          <div class="draft-actions">
+            <p>当前勾选总消耗：{{ preDraftSelectedCost }}</p>
+            <div class="action-row">
+              <button class="ghost" type="button" @click="handleRefreshPreDraft">
+                刷新候选（消耗1点）
+              </button>
+              <button class="primary" type="button" @click="handleConfirmPreDraft">
+                确认构筑并开战
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      v-if="state.draft.midPending"
+      class="modal-backdrop"
+    >
+      <div class="modal draft-modal">
+        <div class="modal-header">
+          <h4>祝福三选一</h4>
+        </div>
+        <div class="modal-body">
+          <p>请选择一个祝福立即生效。</p>
+          <div class="draft-cards">
+            <button
+              v-for="item in state.draft.midCandidates"
+              :key="item.id"
+              class="draft-card"
+              :class="getQualityClass(item.quality)"
+              type="button"
+              @click="handlePickMidDraftBlessing(item.id)"
+            >
+              <p class="draft-type">祝福</p>
+              <h4>{{ item.name }}</h4>
+              <p class="draft-desc">{{ item.desc }}</p>
+              <p class="draft-meta">
+                品质 {{ item.quality }} · 价值 {{ item.cost }} · 层数 {{ getBlessingStackText(item) }}
+              </p>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <div
       v-if="showFormulaModal"
@@ -721,6 +880,43 @@ h1 {
   font-size: 12px;
   color: rgba(255, 255, 255, 0.58);
   line-height: 1.6;
+}
+
+.side-title {
+  font-size: 14px !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+  font-weight: 700;
+}
+
+.side-sub {
+  margin-top: 10px !important;
+  font-size: 12px !important;
+  color: rgba(255, 255, 255, 0.75) !important;
+}
+
+.build-list {
+  margin: 6px 0 0;
+  padding-left: 16px;
+  display: grid;
+  gap: 4px;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 12px;
+}
+
+.build-list small {
+  color: rgba(255, 255, 255, 0.56);
+}
+
+.build-name {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.build-effect {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.64);
 }
 
 .sidebar-tabs {
@@ -1163,6 +1359,113 @@ h1 {
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+.draft-panel {
+  border-radius: 20px;
+  padding: 16px;
+  background: rgba(10, 14, 24, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mid-draft {
+  border-color: rgba(255, 198, 96, 0.4);
+}
+
+.draft-modal {
+  width: min(980px, 96vw);
+}
+
+.draft-head h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.draft-head p {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.draft-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.draft-card {
+  border-radius: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.draft-card.active {
+  border-color: #00ffd0;
+  box-shadow: 0 0 0 2px rgba(0, 255, 208, 0.45);
+  transform: translateY(-1px);
+}
+
+.draft-type {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.58);
+}
+
+.draft-card h4 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.draft-desc {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.72);
+  min-height: 36px;
+}
+
+.draft-meta {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.draft-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.action-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.quality-a {
+  background: linear-gradient(180deg, rgba(255, 215, 128, 0.3), rgba(255, 215, 128, 0.1));
+}
+
+.quality-b {
+  background: linear-gradient(180deg, rgba(143, 214, 255, 0.26), rgba(143, 214, 255, 0.1));
+}
+
+.quality-c {
+  background: linear-gradient(180deg, rgba(220, 220, 220, 0.2), rgba(220, 220, 220, 0.08));
 }
 
 .skills header {

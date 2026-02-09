@@ -1,0 +1,24 @@
+export const blessings = [
+  {
+    id: 1001,
+    name: "战意沸腾",
+    quality: "B",
+    cost: 4,
+    desc: "你的主动技能伤害提高12%。",
+    implKey: "player_damage_boost",
+    repeatable: true,
+    maxStack: 4,
+    tags: ["damage", "starter"],
+  },
+  {
+    id: 1002,
+    name: "复苏",
+    quality: "C",
+    cost: 3,
+    desc: "每回合开始时恢复8点生命值。",
+    implKey: "round_heal",
+    repeatable: false,
+    maxStack: 1,
+    tags: ["heal", "survive"],
+  },
+];

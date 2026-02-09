@@ -1,8 +1,13 @@
 # 项目目录结构与模块说明
-本项目为回合制战斗游戏的前端 + Electron 桌面端。当前支持在 Web 端读取 JS 静态数据，在 Electron 端读取/保存 JSON 数据并进行自定义增删改。
+本项目为回合制战斗游戏的前端 + Electron 桌面端。  
+当前支持：
+- Web 端读取 JS 静态数据。
+- Electron 端读取/保存 JSON 数据并进行自定义增删改。
+- PVE 难度 + 连战模式。
+- 战前构筑（祝福+装备）与战中祝福三选一。
 
 ## 目录结构
-```
+```txt
 cxBattle/
   electron/
     main.js
@@ -21,33 +26,43 @@ cxBattle/
     game/
       data/
         runtimeData.js
+        units.js
         skills.js
         strengths.js
-        units.js
+        blessings.js
+        equipmentAffixes.js
+        units.json
         skills.json
         strengths.json
-        units.json
+        blessings.json
+        equipmentAffixes.json
       engine/
         battle.js
+        battleHooks.js
+      systems/
+        blessingSystem.js
+        equipmentSystem.js
+        draftSystem.js
       useBattle.js
     old/
       fight.js
       fightData.d.ts
       units.js
+  doc/
+    1.2祝福与装备机制文档.md
   package.json
   vite.config.js
 ```
 
 ## 入口与全局
 - `src/main.js`  
-  Vue 入口，已接入 Element Plus 组件库，并加载全局样式。
+  Vue 入口，接入 Element Plus，并加载全局样式。
 
 - `src/App.vue`  
-  页面组合：选人界面、战斗界面、技能池、战斗日志。  
- 选人阶段使用中间主列容器（与战斗主列同宽），左右留白；并挂载 `CustomDataPanel.vue` 用于自定义数据管理。  
- 战斗阶段采用三列 Grid：左侧竖栏 / 中间主区 / 右侧竖栏（预留区）。  
- 左侧竖栏集中放置“技能攻击力计算公式”“难度信息区”“连战模式开关与敌人序号”。  
- 中间战斗信息区顶部（玩家卡 / 回合面板 / 敌方卡）采用 `3:2:3` 比例布局。
+  页面组合：选人界面、战斗界面、技能池、战斗日志、战前构筑与战中三选一。  
+  战斗阶段采用三列 Grid：左侧竖栏 / 中间主区 / 右侧构筑信息区。  
+  战前构筑阶段支持 6 选项（祝福+装备），可消耗点数刷新候选。  
+  战中支持每 10 回合触发祝福三选一，连战击败敌人额外触发一次。
 
 - `src/assets/main.css`  
   全局主题与基础样式。
@@ -64,71 +79,99 @@ cxBattle/
 
 - `src/components/CustomDataPanel.vue`  
   自定义数据管理面板（Element Plus 对话框）。  
-  - 角色/技能/被动的新增、编辑、删除  
-  - 表单字段覆盖 `fightData.d.ts` 定义  
-  - 仅 Electron 端可编辑，Web 端禁用
+  - 角色/技能/被动增删改  
+  - 保存时同步写入运行时与 Electron JSON  
+  - 现已兼容 blessings / equipmentAffixes 的存储同步
 
-## 游戏逻辑层（game/）
-### 数据层 data/
-- `src/game/data/units.js` / `skills.js` / `strengths.js`  
-  Web 端静态数据源。
+## 游戏逻辑层（`src/game/`）
+### 数据层（`data/`）
+- `units.*` / `skills.*` / `strengths.*`  
+  角色、技能、被动数据（JS 静态 + JSON 可写）。
 
-- `src/game/data/units.json` / `skills.json` / `strengths.json`  
-  Electron 端 JSON 数据源，可读写。
+- `blessings.*`  
+  祝福定义数据（当前已含测试祝福）。  
+  已支持字段：`repeatable`（是否可重复）、`maxStack`（最大层数）。
 
-- `src/game/data/runtimeData.js`  
+- `equipmentAffixes.*`  
+  装备词条池（当前为基础词条与占位配置）。
+
+- `runtimeData.js`  
   运行时数据入口：  
-  - Electron 端：使用 `window.demo.getData()` 的 JSON 数据  
+  - Electron 端：读取 `window.demo.getData()`  
   - Web 端：回退到 JS 静态数据  
-  - 提供 `updateRuntimeData` 同步更新数据与 `skillIndex`
+  - 提供 `updateRuntimeData` 同步更新数据（含 blessings / equipmentAffixes）
 
-### 引擎 engine/
-- `src/game/engine/battle.js`  
-  战斗核心：伤害计算、状态应用、回合推进、事件回调。
+### 引擎层（`engine/`）
+- `battle.js`  
+  战斗核心：伤害计算、状态应用、回合推进、被动执行。  
+  现已接入祝福钩子触发点（如伤害前/后、行动前）。
 
-### 状态管理
-- `src/game/useBattle.js`  
-  业务状态与流程管理（选人/战斗/回合/日志）。  
-  已内置 PVE 难度系统（普通/困难/极难/专家/炼狱）：  
-  - 根据难度对敌方生命/攻击/防御、每回合回复、闪避率、暴击率进行倍率或增量调整  
-  - 专家/炼狱难度会为敌方随机追加不重复的被动特长  
-  - 战斗中切换难度会即时刷新敌方数值与被动展示（保留当前血量比例）  
-  已支持连战模式：  
-  - 开启后击败当前敌人不会结束战斗，而是随机切换到下一名敌人  
-  - 维护敌人序号计数，并在 UI 中实时展示
+- `battleHooks.js`  
+  轻量事件总线（on/emit/clear），供祝福系统挂载。
+
+### 系统层（`systems/`）
+- `blessingSystem.js`  
+  祝福实现映射与安装逻辑（`implKey -> handlers`），含测试祝福实现。
+
+- `equipmentSystem.js`  
+  装备生成与属性应用。  
+  注：生成细节目前为占位实现，后续再做品质数值曲线设计。
+
+- `draftSystem.js`  
+  构筑系统：预算、战前 6 选候选、战中 3 选 1 候选。
+  已支持按祝福当前层数过滤候选池（不可重复或达上限不再入池）。
+
+### 状态管理（`useBattle.js`）
+- 管理战斗流程与 UI 状态：
+  - 选人 / 战斗 / 回合 / 日志
+  - 难度系统（普通/困难/极难/专家/炼狱）
+  - 连战模式
+  - 连战成长层数（每击败一个敌人，下一个敌人额外成长）
+  - 战前构筑状态（候选、预算、已选）
+  - 战中祝福三选一状态
+  - 已拥有祝福与装备列表
 
 ## Electron 端
 - `electron/main.js`  
-  Electron 主进程：  
-  - 读取 JSON 数据  
-  - IPC 提供 `demo:get-data-sync`  
-  - IPC 提供 `demo:save-data` 保存 JSON  
-  - 开发时写入 `src/game/data/*.json`  
-  - 打包后写入 `userData/data/*.json`
+  主进程数据读写：  
+  - 读取 `units/skills/strengths/blessings/equipmentAffixes`  
+  - 保存上述 JSON 到可写目录  
+  - 开发写 `src/game/data/*.json`，打包写 `userData/data/*.json`
 
 - `electron/preload.cjs`  
-  预加载脚本：  
-  - 暴露 `window.demo.isElectron`  
-  - 暴露 `window.demo.getData()`  
-  - 暴露 `window.demo.saveData(payload)`
+  预加载脚本：暴露 `window.demo.isElectron/getData/saveData`。
 
-## old（历史参考）
+## 类型参考
 - `src/old/fightData.d.ts`  
-  数据结构定义参考（Unit / Skill / Strength / Condition / Status 等）。
+  数据结构参考，已扩展：
+  - `BlessingDef`
+  - `BlessingInstance`
+  - `EquipmentModifier`
+  - `EquipmentInstance`
+  - `DraftItem`
+
+## 文档
+- `doc/1.2祝福与装备机制文档.md`  
+  本轮祝福与装备机制的技术方案文档（已按当前项目修订）。
 
 ## 依赖与构建
 - `package.json`  
   主要依赖：Vue 3、Element Plus、Electron。  
-  构建脚本包含 Electron 开发与打包流程。
+  包含 Vite 构建与 Electron 开发/打包脚本。
 
-## todos
-大方向：  
-1.后续要考虑多人对战，也就是需要在云服务器写一个服务端，然后这里搞一个联机对战模块。
-2.搞一下肉鸽元素，装备？元素等，需要在数据结构方面改一下
-具体需求todo：
-- 已完成：PVE 难度机制（敌方数值增强、额外被动特长、战斗中可切换难度并即时生效）。
-- 已完成：击败一个敌人后以新敌人替换旧敌人的连续战斗机制（连战模式）。
-- 未完成：调整各项数值，需人工慢慢调整
-- 连战补偿，打完连战后会为角色补偿一些数值
-- 状态、被动特长的触发机制以及作用机制需要优化和扩充，比如弱化状态等都是默认以敌人为目标，没有选择的余地。被动特长的触发机制也比较简陋
-- 已完成：页面布局改为 Grid（战斗页三列、移除 fixed 侧栏、选人页主区居中并与战斗主区同宽）。
+## 当前进度与待办
+### 已完成
+- PVE 难度机制（敌方数值增强、额外被动、战中切换即时生效）。
+- 连战模式（击败后随机切换新敌人并累计序号）。
+- 连战敌人动态成长（每击败 1 人：下一名敌人生命/攻击/防御 +0.2 倍、每回合回复 +1、暴击伤害倍率 +10%）。
+- 祝福与装备框架接入（战前构筑 + 战中三选一 + 连战奖励触发）。
+- 祝福重复规则接入（可重复/不可重复、最大层数上限、候选池自动过滤）。
+- 祝福钩子机制接入战斗核心。
+- 页面布局 Grid 化并接入构筑面板。
+
+### 待完成
+- 装备生成函数的品质与词条数值曲线设计与实装。
+- 祝福条目扩充与平衡性调参。
+- 状态/被动触发机制继续细化（目标选择与更复杂触发时机）。
+- 连战奖励节奏与预算曲线进一步实测优化。
+- 后续多人联机方向的服务端模块规划。
