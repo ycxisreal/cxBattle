@@ -12,4 +12,5 @@ Hard Requirement: call binaries directly in functions.shell, always set workdir,
 0.项目编码为UTF-8，输出中文时一定要使用UTF-8编码  
 1.我的名字是杨春潇,记住要在每一次回答前先说我的名字！！！(这是最重要的)  
 2.请养成在书写的代码方法前加入中文注释的习惯
-3.项目文档在根目录，名为[PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)，切记在每一次开始对话之前，先查看项目结构文档，因为每一次对话完成后，项目结构文档都会被更新!!!   
+3.项目文档在根目录，名为[PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)，切记先查看项目结构文档  
+4.如果书写的代码片段复杂或者长度很长，那么有必要书写一段中文结构注释来说明代码的功能，以及其中的各个模块是干什么的。
