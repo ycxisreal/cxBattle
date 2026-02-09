@@ -1,38 +1,31 @@
 # cxBattle
 
-This template should help get you started developing with Vue 3 in Vite.
+一个基于 `Vue 3 + Vite + Electron` 的回合制战斗 Demo，支持：
+- 难度系统（普通/困难/极难/专家/炼狱）
+- 连战模式与连战敌人成长
+- rougelike祝福与装备构筑系统（战前 6 选、战中三选一）
+- Electron 本地 JSON 数据读写与自定义编辑
 
-## Recommended IDE Setup
+## 快速开始
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
-
-## Recommended Browser Setup
-
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
-
-## Customize configuration
-
-See [Vite Configuration Reference](https://vite.dev/config/).
-
-## Project Setup
-
-```sh
+```bash
 npm install
-```
-
-### Compile and Hot-Reload for Development
-
-```sh
 npm run dev
 ```
 
-### Compile and Minify for Production
+## 主要脚本
 
-```sh
+```bash
+# Web 开发
+npm run dev
+
+# Electron 开发
+npm run electron:dev
+
+# 构建前端
 npm run build
 ```
+
+## 项目文档
+
+- 项目结构说明：`PROJECT_STRUCTURE.md`
