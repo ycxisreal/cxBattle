@@ -186,187 +186,286 @@ const closeDifficultyModal = () => {
 
 <template>
   <div class="app">
-    <header v-if="state.phase === 'select'" class="hero">
-      <div>
-        <p class="kicker">Turn-based Combo Game</p>
-        <h1>cxBattle</h1>
-        <p class="subtitle">
-        </p>
-      </div>
-      <div class="hero-actions">
-        <button class="primary" type="button" @click="toggleRandomize">
-          {{ state.randomize ? "关闭属性浮动" : "开启属性浮动" }}
-        </button>
-      </div>
-    </header>
-
-    <section v-if="state.phase === 'select'" class="select">
-      <div class="select-panel">
-        <div class="select-head">
-          <h3>选择你的角色</h3>
-          <p>选择一名角色进入战斗，对手将随机生成。</p>
-        </div>
-        <div class="select-controls">
-          <p class="page-indicator">
-            第 {{ currentUnitPage }} / {{ totalUnitPages }} 页，最多展示 {{ maxUnitDisplay }} 名
+    <div v-if="state.phase === 'select'" class="select-layout">
+      <header class="hero">
+        <div>
+          <p class="kicker">Turn-based Combo Game</p>
+          <h1>cxBattle</h1>
+          <p class="subtitle">
           </p>
-          <div class="select-actions">
-            <button
-              class="ghost"
-              type="button"
-              :disabled="!shouldShowUnitControls"
-              @click="prevUnitPage"
-            >
-              上一批
-            </button>
-            <button
-              class="ghost"
-              type="button"
-              :disabled="!shouldShowUnitControls"
-              @click="nextUnitPage"
-            >
-              下一批
-            </button>
-            <button class="primary" type="button" @click="openUnitModal">
-              查看全部
-            </button>
-          </div>
         </div>
-        <div class="select-grid">
-          <button
-            v-for="unit in pagedUnits"
-            :key="unit.id"
-            class="select-card"
-            :class="{ active: selectedUnitId === unit.id }"
-            type="button"
-            @click="handleSelectUnit(unit.id)"
-          >
-            <h4>{{ unit.name }}</h4>
-            <p class="des">{{ unit.des }}</p>
-            <div class="stats">
-              <span>攻击 {{ unit.attack }}</span>
-              <span>防御 {{ unit.defence }}</span>
-              <span>速度 {{ unit.speed }}</span>
-            </div>
+        <div class="hero-actions">
+          <button class="primary" type="button" @click="toggleRandomize">
+            {{ state.randomize ? "关闭属性浮动" : "开启属性浮动" }}
           </button>
         </div>
-      </div>
-      <aside class="select-preview">
-        <h3>预览</h3>
-        <UnitCard
-          v-if="selectedUnit"
-          title="已选择"
-          :unit="selectedUnit"
-          theme="player"
-          :strengths="strengths"
-        />
-        <p v-else class="hint">请选择一个角色查看详情。</p>
-        <button
-          class="primary start"
-          type="button"
-          :disabled="!selectedUnitId"
-          @click="startBattle"
-        >
-          进入战斗
-        </button>
+      </header>
+
+      <section class="select">
+        <div class="select-panel">
+          <div class="select-head">
+            <h3>选择你的角色</h3>
+            <p>选择一名角色进入战斗，对手将随机生成。</p>
+          </div>
+          <div class="select-controls">
+            <p class="page-indicator">
+              第 {{ currentUnitPage }} / {{ totalUnitPages }} 页，最多展示 {{ maxUnitDisplay }} 名
+            </p>
+            <div class="select-actions">
+              <button
+                class="ghost"
+                type="button"
+                :disabled="!shouldShowUnitControls"
+                @click="prevUnitPage"
+              >
+                上一批
+              </button>
+              <button
+                class="ghost"
+                type="button"
+                :disabled="!shouldShowUnitControls"
+                @click="nextUnitPage"
+              >
+                下一批
+              </button>
+              <button class="primary" type="button" @click="openUnitModal">
+                查看全部
+              </button>
+            </div>
+          </div>
+          <div class="select-grid">
+            <button
+              v-for="unit in pagedUnits"
+              :key="unit.id"
+              class="select-card"
+              :class="{ active: selectedUnitId === unit.id }"
+              type="button"
+              @click="handleSelectUnit(unit.id)"
+            >
+              <h4>{{ unit.name }}</h4>
+              <p class="des">{{ unit.des }}</p>
+              <div class="stats">
+                <span>攻击 {{ unit.attack }}</span>
+                <span>防御 {{ unit.defence }}</span>
+                <span>速度 {{ unit.speed }}</span>
+              </div>
+            </button>
+          </div>
+        </div>
+        <aside class="select-preview">
+          <h3>预览</h3>
+          <UnitCard
+            v-if="selectedUnit"
+            title="已选择"
+            :unit="selectedUnit"
+            theme="player"
+            :strengths="strengths"
+          />
+          <p v-else class="hint">请选择一个角色查看详情。</p>
+          <button
+            class="primary start"
+            type="button"
+            :disabled="!selectedUnitId"
+            @click="startBattle"
+          >
+            进入战斗
+          </button>
+        </aside>
+      </section>
+
+      <CustomDataPanel />
+    </div>
+
+    <section v-if="state.phase === 'battle'" class="battle-layout">
+      <aside class="battle-side battle-side-left">
+        <div class="battle-sidebar">
+          <div class="sidebar-tabs">
+            <button
+              v-for="tab in sidebarTabs"
+              :key="tab.id"
+              type="button"
+              class="sidebar-tab"
+              :class="{ active: tab.id === activeSidebarId }"
+              @click="handleSidebarSelect(tab.id)"
+            >
+              {{ tab.title }}
+            </button>
+          </div>
+          <div class="difficulty-quick">
+            <p class="difficulty-current">
+              当前难度：
+              <span class="difficulty-badge" :class="currentDifficultyTone">{{ currentDifficultyLabel }}</span>
+            </p>
+            <button
+              class="ghost difficulty-open-btn"
+              :class="currentDifficultyTone"
+              type="button"
+              @click="showDifficultyModal = true"
+            >
+              选择难度
+            </button>
+          </div>
+          <div class="chain-quick">
+            <button class="ghost chain-open-btn" type="button" @click="toggleChainMode">
+              {{ state.chainMode ? "关闭连战模式" : "开启连战模式" }}
+            </button>
+            <p v-if="state.chainMode" class="enemy-index-text">当前第 {{ state.enemyIndex }} 个敌人</p>
+          </div>
+        </div>
       </aside>
-    </section>
 
-    <CustomDataPanel v-if="state.phase === 'select'" />
+      <div class="battle-main">
+        <section class="arena">
+          <UnitCard
+            title="玩家"
+            :unit="state.player"
+            theme="player"
+            :active="state.activeTurn === 'player'"
+            :hit="state.effects.playerHit"
+            :status="state.effects.playerStatus"
+            :strengths="strengths"
+          />
+          <div class="center-panel">
+            <div class="round">
+              <p>第 {{ state.round }} 回合</p>
+              <span v-if="state.over" class="result">
+                {{ state.winner === "平局" ? "平局" : `${state.winner}获胜` }}
+              </span>
+              <span v-else class="result">
+                {{ state.busy ? "行动结算中..." : "等待玩家选择招式" }}
+              </span>
+            </div>
+            <div class="tips">
+              <div>
+                <strong>速度决定先手</strong>
+                <p>
+                  {{ state.player?.speed?.toFixed(1) || 0 }} vs
+                  {{ state.enemy?.speed?.toFixed(1) || 0 }}
+                </p>
+              </div>
+              <div>
+                <strong>暴击率</strong>
+                <p>
+                  {{ ((state.player?.criticalRate ?? 0) * 100).toFixed(0) }}% /
+                  {{ ((state.enemy?.criticalRate ?? 0) * 100).toFixed(0) }}%
+                </p>
+              </div>
+              <div>
+                <strong>闪避率</strong>
+                <p>
+                  {{ ((state.player?.missRate ?? 0) * 100).toFixed(0) }}% /
+                  {{ ((state.enemy?.missRate ?? 0) * 100).toFixed(0) }}%
+                </p>
+              </div>
+            </div>
+            <div class="notice">
+              <p>
+                命中、暴击与状态持续回合都会影响下一次行动，请留意日志。
+              </p>
+            </div>
+          </div>
+          <UnitCard
+            title="对手"
+            :unit="state.enemy"
+            theme="enemy"
+            :active="state.activeTurn === 'enemy'"
+            :hit="state.effects.enemyHit"
+            :status="state.effects.enemyStatus"
+            :strengths="strengths"
+          />
+        </section>
 
-    <aside v-if="state.phase === 'battle'" class="battle-sidebar">
-      <div class="sidebar-tabs">
-        <button
-          v-for="tab in sidebarTabs"
-          :key="tab.id"
-          type="button"
-          class="sidebar-tab"
-          :class="{ active: tab.id === activeSidebarId }"
-          @click="handleSidebarSelect(tab.id)"
-        >
-          {{ tab.title }}
-        </button>
-      </div>
-      <div class="difficulty-quick">
-        <p class="difficulty-current">
-          当前难度：
-          <span class="difficulty-badge" :class="currentDifficultyTone">{{ currentDifficultyLabel }}</span>
-        </p>
-        <button
-          class="ghost difficulty-open-btn"
-          :class="currentDifficultyTone"
-          type="button"
-          @click="showDifficultyModal = true"
-        >
-          选择难度
-        </button>
-      </div>
-      <div class="chain-quick">
-        <button class="ghost chain-open-btn" type="button" @click="toggleChainMode">
-          {{ state.chainMode ? "关闭连战模式" : "开启连战模式" }}
-        </button>
-        <p v-if="state.chainMode" class="enemy-index-text">当前第 {{ state.enemyIndex }} 个敌人</p>
-      </div>
-    </aside>
-
-    <section v-if="state.phase === 'battle'" class="arena">
-      <UnitCard
-        title="玩家"
-        :unit="state.player"
-        theme="player"
-        :active="state.activeTurn === 'player'"
-        :hit="state.effects.playerHit"
-        :status="state.effects.playerStatus"
-        :strengths="strengths"
-      />
-      <div class="center-panel">
-        <div class="round">
-          <p>第 {{ state.round }} 回合</p>
-          <span v-if="state.over" class="result">
-            {{ state.winner === "平局" ? "平局" : `${state.winner}获胜` }}
-          </span>
-          <span v-else class="result">
-            {{ state.busy ? "行动结算中..." : "等待玩家选择招式" }}
-          </span>
-        </div>
-        <div class="tips">
-          <div>
-            <strong>速度决定先手</strong>
-            <p>
-              {{ state.player?.speed?.toFixed(1) || 0 }} vs
-              {{ state.enemy?.speed?.toFixed(1) || 0 }}
-            </p>
+        <section class="skills">
+          <header>
+            <h3>选择招式</h3>
+            <p>可从技能池中手动选择 4 个作为出招栏。</p>
+          </header>
+          <div class="skill-bar">
+            <div class="skill-list compact">
+              <SkillCard
+                v-for="skill in visibleSkills"
+                :key="skill.id"
+                :skill="skill"
+                :disabled="state.over || state.busy"
+                @click="chooseSkill(skill.id)"
+              />
+            </div>
+            <div class="slot-actions">
+              <button class="ghost" type="button" @click="toggleSkillPool">
+                {{ showSkillPool ? "收起技能池" : "手动选择招式" }}
+              </button>
+              <button class="ghost" type="button" @click="clearSkillSlots">
+                清空手动出招栏
+              </button>
+              <p class="page-indicator">
+                手动已选择 {{ selectedSkillIds.length }} / 4
+              </p>
+            </div>
           </div>
-          <div>
-            <strong>暴击率</strong>
-            <p>
-              {{ ((state.player?.criticalRate ?? 0) * 100).toFixed(0) }}% /
-              {{ ((state.enemy?.criticalRate ?? 0) * 100).toFixed(0) }}%
-            </p>
+          <div v-if="showSkillPool" class="skill-pool">
+            <button
+              v-for="skill in playerSkills"
+              :key="skill.id"
+              class="pool-item"
+              :class="{ selected: isSkillSelected(skill.id) }"
+              type="button"
+              @click="toggleSkillSlot(skill.id)"
+            >
+              <span>{{ skill.name }}</span>
+              <small>伤害 {{ skill.power ?? 0 }}</small>
+              <div class="pool-tooltip">
+                <p><strong>{{ skill.name }}</strong></p>
+                <p>效果：{{ skill.des || "无" }}</p>
+                <p>命中：{{ (skill.accuracy * 100).toFixed(0) }}%</p>
+                <p>暴击：{{ (skill.criticalRate * 100).toFixed(0) }}%</p>
+                <p v-if="skill.suckBloodRate">
+                  吸血：{{ (skill.suckBloodRate * 100).toFixed(0) }}%
+                </p>
+                <p v-if="skill.putStatus?.length">
+                  附加状态：{{ skill.putStatus.map((s) => s.name).join("，") }}
+                </p>
+                <p v-if="skill.changeValue?.length">
+                  属性变化：{{ skill.changeValue.map((c) => c.name).join("，") }}
+                </p>
+              </div>
+            </button>
           </div>
-          <div>
-            <strong>闪避率</strong>
-            <p>
-              {{ ((state.player?.missRate ?? 0) * 100).toFixed(0) }}% /
-              {{ ((state.enemy?.missRate ?? 0) * 100).toFixed(0) }}%
-            </p>
-          </div>
-        </div>
-        <div class="notice">
-          <p>
-            命中、暴击与状态持续回合都会影响下一次行动，请留意日志。
+          <button
+            v-if="state.player?.stopRound > 0 && !state.over"
+            class="ghost skip"
+            type="button"
+            :disabled="state.busy"
+            @click="skipRound"
+          >
+            跳过回合
+          </button>
+          <p v-if="state.player?.stopRound > 0" class="hint">
+            玩家当前被停止行动，回合结束后自动恢复。
           </p>
-        </div>
+          <p v-if="state.over" class="hint">战斗结束，可点击重置再次战斗。</p>
+        </section>
+
+        <BattleLog :entries="state.log">
+          <template #actions>
+            <button class="ghost reset-enemy-btn" type="button" @click="handleResetBattle">
+              <el-icon><Refresh /></el-icon>
+              <span>刷新敌人</span>
+            </button>
+            <button class="ghost" type="button" @click="toggleRandomize">
+              {{ state.randomize ? "关闭属性浮动" : "开启属性浮动" }}
+            </button>
+            <button class="ghost" type="button" @click="handleBackToSelect">
+              返回选人
+            </button>
+          </template>
+        </BattleLog>
       </div>
-      <UnitCard
-        title="对手"
-        :unit="state.enemy"
-        theme="enemy"
-        :active="state.activeTurn === 'enemy'"
-        :hit="state.effects.enemyHit"
-        :status="state.effects.enemyStatus"
-        :strengths="strengths"
-      />
+
+      <aside class="battle-side battle-side-right" aria-hidden="true">
+        <div class="side-placeholder">
+          <p>右侧区域预留（后续可放战报、Buff列表或快捷信息）</p>
+        </div>
+      </aside>
     </section>
 
     <div
@@ -484,98 +583,23 @@ const closeDifficultyModal = () => {
       </div>
     </div>
 
-    <section v-if="state.phase === 'battle'" class="skills">
-      <header>
-        <h3>选择招式</h3>
-        <p>可从技能池中手动选择 4 个作为出招栏。</p>
-      </header>
-      <div class="skill-bar">
-        <div class="skill-list compact">
-          <SkillCard
-            v-for="skill in visibleSkills"
-            :key="skill.id"
-            :skill="skill"
-            :disabled="state.over || state.busy"
-            @click="chooseSkill(skill.id)"
-          />
-        </div>
-        <div class="slot-actions">
-          <button class="ghost" type="button" @click="toggleSkillPool">
-            {{ showSkillPool ? "收起技能池" : "手动选择招式" }}
-          </button>
-          <button class="ghost" type="button" @click="clearSkillSlots">
-            清空手动出招栏
-          </button>
-          <p class="page-indicator">
-            手动已选择 {{ selectedSkillIds.length }} / 4
-          </p>
-        </div>
-      </div>
-      <div v-if="showSkillPool" class="skill-pool">
-        <button
-          v-for="skill in playerSkills"
-          :key="skill.id"
-          class="pool-item"
-          :class="{ selected: isSkillSelected(skill.id) }"
-          type="button"
-          @click="toggleSkillSlot(skill.id)"
-        >
-          <span>{{ skill.name }}</span>
-          <small>伤害 {{ skill.power ?? 0 }}</small>
-          <div class="pool-tooltip">
-            <p><strong>{{ skill.name }}</strong></p>
-            <p>效果：{{ skill.des || "无" }}</p>
-            <p>命中：{{ (skill.accuracy * 100).toFixed(0) }}%</p>
-            <p>暴击：{{ (skill.criticalRate * 100).toFixed(0) }}%</p>
-            <p v-if="skill.suckBloodRate">
-              吸血：{{ (skill.suckBloodRate * 100).toFixed(0) }}%
-            </p>
-            <p v-if="skill.putStatus?.length">
-              附加状态：{{ skill.putStatus.map((s) => s.name).join("，") }}
-            </p>
-            <p v-if="skill.changeValue?.length">
-              属性变化：{{ skill.changeValue.map((c) => c.name).join("，") }}
-            </p>
-          </div>
-        </button>
-      </div>
-      <button
-        v-if="state.player?.stopRound > 0 && !state.over"
-        class="ghost skip"
-        type="button"
-        :disabled="state.busy"
-        @click="skipRound"
-      >
-        跳过回合
-      </button>
-      <p v-if="state.player?.stopRound > 0" class="hint">
-        玩家当前被停止行动，回合结束后自动恢复。
-      </p>
-      <p v-if="state.over" class="hint">战斗结束，可点击重置再次战斗。</p>
-    </section>
-
-    <BattleLog v-if="state.phase === 'battle'" :entries="state.log">
-      <template #actions>
-        <button class="ghost reset-enemy-btn" type="button" @click="handleResetBattle">
-          <el-icon><Refresh /></el-icon>
-          <span>刷新敌人</span>
-        </button>
-        <button class="ghost" type="button" @click="toggleRandomize">
-          {{ state.randomize ? "关闭属性浮动" : "开启属性浮动" }}
-        </button>
-        <button class="ghost" type="button" @click="handleBackToSelect">
-          返回选人
-        </button>
-      </template>
-    </BattleLog>
   </div>
 </template>
 
 <style scoped>
 .app {
-  max-width: 1200px;
+  --center-column-width: 1180px;
+  max-width: 100vw;
   margin: 0 auto;
   padding: 36px 24px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.select-layout {
+  width: min(100%, var(--center-column-width));
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 28px;
@@ -644,25 +668,59 @@ h1 {
   font-weight: 600;
 }
 
+.battle-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, var(--center-column-width)) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.battle-main {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+.battle-side {
+  min-height: 100%;
+}
+
+.battle-side-left,
+.battle-side-right {
+  position: sticky;
+  top: 20px;
+}
+
 .arena {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(240px, 280px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 3fr) minmax(240px, 2fr) minmax(0, 3fr);
   gap: 16px;
 }
 
 .battle-sidebar {
-  position: fixed;
-  left: 16px;
-  top: 120px;
-  width: 220px;
   border-radius: 18px;
-  padding: 12px;
+  padding: 14px;
   background: rgba(10, 14, 22, 0.92);
   border: 1px solid rgba(255, 255, 255, 0.12);
   display: flex;
   flex-direction: column;
   gap: 14px;
-  z-index: 12;
+}
+
+.side-placeholder {
+  min-height: 100%;
+  border-radius: 18px;
+  padding: 18px 14px;
+  background: rgba(10, 14, 22, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.side-placeholder p {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.58);
+  line-height: 1.6;
 }
 
 .sidebar-tabs {
@@ -1250,17 +1308,29 @@ h1 {
 }
 
 @media (max-width: 1024px) {
+  .battle-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .battle-main {
+    order: 2;
+  }
+
+  .battle-side-left,
+  .battle-side-right {
+    position: static;
+  }
+
+  .battle-side-right {
+    display: none;
+  }
+
   .arena {
     grid-template-columns: 1fr;
   }
 
   .center-panel {
     order: 2;
-  }
-
-  .battle-sidebar {
-    position: static;
-    width: auto;
   }
 
   .select {
