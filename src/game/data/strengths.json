@@ -364,5 +364,33 @@
       }
     ],
     "accuracy": 1
+  },
+  {
+    "id": 22,
+    "name": "神圣盾牌【*】",
+    "des": "自身生命值低于50%时，每隔2回合有80%的几率为自身增加2回合的加10护甲状态。",
+    "condition": {
+      "type": "<",
+      "interval": 2,
+      "dice": 0.8,
+      "selfCondition": {
+        "health": 0,
+        "healthRate": 0.5,
+        "attack": 0,
+        "defence": 0,
+        "attackRate": 0,
+        "defenceRate": 0
+      }
+    },
+    "power": 0,
+    "status": [
+      {
+        "name": "armor",
+        "round": 2,
+        "value": 10
+      }
+    ],
+    "changeValue": [],
+    "accuracy": 1
   }
 ]

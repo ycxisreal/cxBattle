@@ -3,8 +3,8 @@
     "id": 1001,
     "name": "战意沸腾",
     "quality": "A",
-    "cost": 6,
-    "desc": "你的主动技能伤害提高12%。",
+    "cost": 5,
+    "desc": "你的主动技能伤害提高12%。最多提高48%伤害。",
     "implKey": "player_damage_boost",
     "repeatable": true,
     "maxStack": 4,
@@ -26,5 +26,159 @@
       "heal",
       "survive"
     ]
+  },
+  {
+    "id": 1003,
+    "name": "连环暴击",
+    "quality": "B",
+    "cost": 3,
+    "desc": "当你的技能造成暴击伤害时触发，额外造成你角色攻击力的20%伤害，最大造成100%伤害",
+    "implKey": "chain_critical_hit",
+    "repeatable": true,
+    "maxStack": 5,
+    "tags": []
+  },
+  {
+    "id": 1004,
+    "name": "杀戮之力",
+    "quality": "A",
+    "cost": 2,
+    "desc": "击杀敌人时，自身攻击力提升5，最多5层。",
+    "implKey": "on_kill_gain_power",
+    "repeatable": true,
+    "maxStack": 5,
+    "tags": []
+  },
+  {
+    "id": 1005,
+    "name": "生机掠夺",
+    "quality": "B",
+    "cost": 4,
+    "desc": "击杀时，回复已失去生命值的20%",
+    "implKey": "life_steal_on_hit",
+    "repeatable": false,
+    "maxStack": 1,
+    "tags": []
+  },
+  {
+    "id": 1006,
+    "name": "定时开火闹钟",
+    "quality": "C",
+    "cost": 3,
+    "desc": "回合开始时，自动对敌方造成10点伤害。最高10层。",
+    "implKey": "interval_auto_fire",
+    "repeatable": true,
+    "maxStack": 10,
+    "tags": []
+  },
+  {
+    "id": 1007,
+    "name": "骑士精神",
+    "quality": "C",
+    "cost": 3,
+    "desc": "使用技能时，若技能无威力，则治疗自身4点生命值。最高8层。",
+    "implKey": "knight_valor",
+    "repeatable": true,
+    "maxStack": 8,
+    "tags": []
+  },
+  {
+    "id": 1008,
+    "name": "本地知识",
+    "quality": "C",
+    "cost": 3,
+    "desc": "若回合结束时，自身处与正面效果增益状态的话，回复自身3点生命值，最高5层。",
+    "implKey": "local_knowledge",
+    "repeatable": true,
+    "maxStack": 5,
+    "tags": []
+  },
+  {
+    "id": 1009,
+    "name": "大象踩踩背",
+    "quality": "A",
+    "cost": 6,
+    "desc": "触发暴击伤害时，有20%几率会额外追加对方当前生命值30%的伤害。",
+    "implKey": "heavy_trample_hit",
+    "repeatable": false,
+    "maxStack": 1,
+    "tags": []
+  },
+  {
+    "id": 1010,
+    "name": "护盾加身",
+    "quality": "A",
+    "cost": 6,
+    "desc": "为玩家增加【神圣护盾】被动特长。\n【神圣护盾】：自身生命值低于50%时，每隔2回合有80%的几率为自身增加2回合的加10护甲状态。",
+    "implKey": "add_holy_shield",
+    "repeatable": false,
+    "maxStack": 1,
+    "tags": []
+  },
+  {
+    "id": 1011,
+    "name": "灵魂收割",
+    "quality": "A",
+    "cost": 6,
+    "desc": "为玩家增加灵魂收割技能。\n【灵魂收割】：收割敌人的生命力，伤害的40%恢复自身生命。",
+    "implKey": "soul_harvest",
+    "repeatable": false,
+    "maxStack": 1,
+    "tags": []
+  },
+  {
+    "id": 1012,
+    "name": "进口护甲",
+    "quality": "B",
+    "cost": 4,
+    "desc": "玩家角色防御力增加10，最多增加3次",
+    "implKey": "reinforced_armor",
+    "repeatable": true,
+    "maxStack": 3,
+    "tags": []
+  },
+  {
+    "id": 1013,
+    "name": "大太刀",
+    "quality": "B",
+    "cost": 4,
+    "desc": "立刻为自己增加10回合15%攻击强化状态。一次性祝福，不会受层数影响。",
+    "implKey": "great_katana",
+    "repeatable": true,
+    "maxStack": 100,
+    "tags": []
+  },
+  {
+    "id": 1014,
+    "name": "骰子改进计划A",
+    "quality": "A",
+    "cost": 6,
+    "desc": "将玩家角色的随机倍率下限与上限均提升0.15",
+    "implKey": "dice_improve_plan_a",
+    "repeatable": false,
+    "maxStack": 1,
+    "tags": []
+  },
+  {
+    "id": 1015,
+    "name": "骰子改进计划B",
+    "quality": "B",
+    "cost": 4,
+    "desc": "将玩家的随机倍率下限与上限均提升0.1",
+    "implKey": "dice_improve_plan_b",
+    "repeatable": false,
+    "maxStack": 1,
+    "tags": []
+  },
+  {
+    "id": 1016,
+    "name": "骰子改进计划C",
+    "quality": "C",
+    "cost": 2,
+    "desc": "将玩家的随机倍率的下限与上限均提升0.05",
+    "implKey": "dice_improve_plan_c",
+    "repeatable": false,
+    "maxStack": 1,
+    "tags": []
   }
 ]

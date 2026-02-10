@@ -20,17 +20,21 @@ import { applyEquipmentsToUnit } from "./systems/equipmentSystem.js";
 import {
   buildMidDraftCandidates,
   buildPreDraftCandidates,
+  getMidDraftQualityWeights,
   getBudgetByDifficulty,
+  refreshPreDraftCandidatesWithLocks,
 } from "./systems/draftSystem.js";
 
-const MAX_LOGS = 120;
+const LOG_ROUND_SEGMENT_SIZE = 100;
 const MAX_SIDE_LOGS = 10;
 const PRE_DRAFT_REFRESH_COST = 1;
 const DEFAULT_MID_DRAFT_INTERVAL = 10;
 const MAX_EQUIPMENT_SLOTS = 2;
-const CHAIN_ENEMY_GROWTH_PER_KILL = 0.2;
+const CHAIN_ENEMY_GROWTH_STEP_PER_KILL = 0.05;
+const CHAIN_ENEMY_GROWTH_MAX_RATE = 0.15;
 const CHAIN_ENEMY_HEAL_BONUS_PER_KILL = 1;
 const CHAIN_ENEMY_CRIT_HURT_BONUS_PER_KILL = 0.1;
+const MID_DRAFT_HALF_HP_TRIGGER_START_ENEMY_INDEX = 5;
 
 const DIFFICULTY_OPTIONS = [
   { key: "normal", label: "普通" },
@@ -90,6 +94,13 @@ const DIFFICULTY_CONFIG = {
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
+// 连战生命/攻击/防御成长率：首次5%，之后每击杀+5%，最高15%。
+const getChainEnemyGrowthRate = (growthLevel = 0) => {
+  const level = Math.max(0, Number(growthLevel || 0));
+  if (!level) return 0;
+  return Math.min(level * CHAIN_ENEMY_GROWTH_STEP_PER_KILL, CHAIN_ENEMY_GROWTH_MAX_RATE);
+};
+
 // 为指定单位补充不重复的随机被动特长。
 const pickExtraStrengthIds = (ownedStrengthIds = [], count = 0) => {
   if (!count) return [];
@@ -140,7 +151,8 @@ const applyChainGrowthToEnemyBase = (enemyBase, growthLevel = 0) => {
   const level = Math.max(0, Number(growthLevel || 0));
   if (!level) return enemyBase;
   const next = JSON.parse(JSON.stringify(enemyBase));
-  const growthMul = 1 + CHAIN_ENEMY_GROWTH_PER_KILL * level;
+  const growthRate = getChainEnemyGrowthRate(level);
+  const growthMul = 1 + growthRate;
   next.hpCount = Number(next.hpCount ?? 0) * growthMul;
   next.hp = next.hpCount;
   next.attack = Number(next.attack ?? 0) * growthMul;
@@ -168,7 +180,6 @@ const createLogManager = (state) => ({
       type,
       round,
     });
-    if (state.log.length > MAX_LOGS) state.log.pop();
   },
 });
 
@@ -188,7 +199,6 @@ export const useBattle = () => {
   const state = reactive({
     phase: "select",
     round: 1,
-    maxRounds: 100,
     over: false,
     winner: null,
     randomize: true,
@@ -214,6 +224,10 @@ export const useBattle = () => {
       selectedPreIds: [],
       refreshCost: PRE_DRAFT_REFRESH_COST,
       midDraftRoundInterval: DEFAULT_MID_DRAFT_INTERVAL,
+      midDraftOpenCount: 0,
+      midDraftQualityWeights: getMidDraftQualityWeights(0),
+      halfHpTriggerEnemyStartIndex: MID_DRAFT_HALF_HP_TRIGGER_START_ENEMY_INDEX,
+      enemyHalfHpTriggered: false,
     },
     log: [],
     sideLog: [],
@@ -271,6 +285,9 @@ export const useBattle = () => {
     state.draft.preCandidates = [];
     state.draft.midCandidates = [];
     state.draft.selectedPreIds = [];
+    state.draft.midDraftOpenCount = 0;
+    state.draft.midDraftQualityWeights = getMidDraftQualityWeights(0);
+    state.draft.enemyHalfHpTriggered = false;
     state.sideLog = [];
   };
 
@@ -318,11 +335,14 @@ export const useBattle = () => {
     state.chainGrowthLevel += 1;
     state.enemy = createEnemyByDifficulty(nextEnemyBase, state.chainGrowthLevel);
     state.enemyIndex += 1;
+    state.draft.enemyHalfHpTriggered = false;
     sideLog(
       `连战继续：第${state.enemyIndex}个敌人 ${state.enemy.name} 登场（连战成长层数 ${state.chainGrowthLevel}）`
     );
     sideLog(
-      `连战成长：下一敌人倍率 +${(state.chainGrowthLevel * 0.2).toFixed(1)}，回复 +${state.chainGrowthLevel}`
+      `连战成长：下一敌人生命/攻击/防御 +${Math.round(
+        getChainEnemyGrowthRate(state.chainGrowthLevel) * 100
+      )}%，回复 +${state.chainGrowthLevel}`
     );
   };
 
@@ -373,13 +393,35 @@ export const useBattle = () => {
     return { ok: true, stacked: false };
   };
 
-  // 生成战中三选一候选并置为待选择。
+  // 生成战中三选一候选并置为待选择；返回是否成功打开三选一。
   const openMidDraft = (reasonText) => {
-    state.draft.midCandidates = buildMidDraftCandidates(getAvailableBlessingPool(), 3);
+    if (state.over || state.draft.prePending || state.draft.midPending) return false;
+    const availablePool = getAvailableBlessingPool();
+    // 若可获取祝福已全部达上限，则改为发放生命上限与生命值奖励。
+    if (!availablePool.length) {
+      if (state.player) {
+        state.player.hpCount = Number(state.player.hpCount || 0) + 10;
+        state.player.hp = Math.min(
+          Number(state.player.hp || 0) + 10,
+          state.player.hpCount
+        );
+        sideLog(`祝福池已满：${reasonText}，改为获得 +10 生命上限与 +10 生命值。`);
+      }
+      return false;
+    }
+    const qualityWeights = getMidDraftQualityWeights(state.draft.midDraftOpenCount);
+    state.draft.midCandidates = buildMidDraftCandidates(availablePool, 3, {
+      midDraftCount: state.draft.midDraftOpenCount,
+      qualityWeights,
+    });
     state.draft.midPending = state.draft.midCandidates.length > 0;
     if (state.draft.midPending) {
+      state.draft.midDraftOpenCount += 1;
+      state.draft.midDraftQualityWeights = getMidDraftQualityWeights(state.draft.midDraftOpenCount);
       sideLog(`祝福三选一触发：${reasonText}`);
+      return true;
     }
+    return false;
   };
 
   // 初始化战斗（共用主流程），并进入战前构筑阶段。
@@ -397,6 +439,7 @@ export const useBattle = () => {
     state.player = createUnitInstance(playerBase, "杨春潇");
     state.enemy = createEnemyByDifficulty(enemyBase);
     state.enemyIndex = 1;
+    state.draft.enemyHalfHpTriggered = false;
     if (state.randomize) applyRandomMode(state.player);
     log(`战斗初始化：${state.player.name} vs ${state.enemy.name}`);
     logger.push(`第 ${state.round} 回合`, "round", state.round);
@@ -451,13 +494,20 @@ export const useBattle = () => {
       sideLog("点数不足，无法刷新候选。");
       return;
     }
+    const lockedDraftIds = [...state.draft.selectedPreIds];
     state.pointsUsed += state.draft.refreshCost;
-    state.draft.preCandidates = buildPreDraftCandidates(
+    state.draft.preCandidates = refreshPreDraftCandidatesWithLocks(
+      state.draft.preCandidates,
+      lockedDraftIds,
       getAvailableBlessingPool(),
       equipmentAffixes
     );
-    state.draft.selectedPreIds = [];
-    sideLog(`已消耗${state.draft.refreshCost}点刷新候选。`);
+    state.draft.selectedPreIds = state.draft.preCandidates
+      .filter((item) => lockedDraftIds.includes(item.draftId))
+      .map((item) => item.draftId);
+    sideLog(
+      `已消耗${state.draft.refreshCost}点刷新候选（已固定${state.draft.selectedPreIds.length}项）。`
+    );
   };
 
   // 确认战前构筑并应用属性/祝福。
@@ -517,6 +567,17 @@ export const useBattle = () => {
     sideLog(`已获得祝福：${blessingDef.name}（当前层数 ${stackText}）`);
   };
 
+  // 从第5个敌人起：敌方生命首次降至50%及以下时触发一次祝福三选一，换敌后重置。
+  const tryOpenMidDraftByEnemyHalfHp = () => {
+    if (!state.enemy || state.enemy.hpCount <= 0) return false;
+    if (state.enemyIndex < state.draft.halfHpTriggerEnemyStartIndex) return false;
+    if (state.draft.enemyHalfHpTriggered) return false;
+    if (state.enemy.hp <= 0) return false;
+    if (state.enemy.hp > state.enemy.hpCount / 2) return false;
+    state.draft.enemyHalfHpTriggered = true;
+    return openMidDraft(`第${state.enemyIndex}个敌人生命首次降至50%`);
+  };
+
   const resetBattle = () => {
     const playerBase =
       units.find((unit) => unit.id === state.selectedPlayerId) ??
@@ -561,11 +622,9 @@ export const useBattle = () => {
     emitBattleHook("onRoundEnd");
     reduceRound([state.player, state.enemy], log);
     state.round += 1;
-    if (state.round > state.maxRounds && !state.over) {
-      state.over = true;
-      state.winner = "平局";
-      log("回合数达到上限，判定为平局。");
-      return;
+    // 每进入新的100回合区间时清空日志，仅保留当前区间（如101-200）。
+    if (state.round > 1 && (state.round - 1) % LOG_ROUND_SEGMENT_SIZE === 0) {
+      state.log = [];
     }
     logger.push(`第 ${state.round} 回合`, "round", state.round);
     if (state.round % state.draft.midDraftRoundInterval === 0) {
@@ -624,6 +683,9 @@ export const useBattle = () => {
     const overResult = checkOver(attacker, defender);
     if (overResult.ended || overResult.skipRemainingTurn) {
       return { skipRemainingTurn: overResult.skipRemainingTurn };
+    }
+    if (defender === state.enemy && tryOpenMidDraftByEnemyHalfHp()) {
+      return { skipRemainingTurn: true };
     }
     return { skipRemainingTurn: false };
   };

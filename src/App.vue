@@ -235,6 +235,34 @@ const preDraftSelectedCost = computed(() =>
     .filter((item) => state.draft.selectedPreIds.includes(item.draftId))
     .reduce((sum, item) => sum + Number(item.cost || 0), 0)
 );
+
+// 展示战中祝福三选一触发条件与当前生效状态。
+const midDraftTriggerConditions = computed(() => {
+  const conditions = [
+    `每 ${state.draft.midDraftRoundInterval} 回合触发一次`,
+    state.chainMode ? "连战中：每击败 1 个敌人触发一次" : "连战中：每击败 1 个敌人触发一次（当前未开启）",
+  ];
+  const startEnemyIndex = Number(state.draft.halfHpTriggerEnemyStartIndex || 5);
+  if (state.enemyIndex >= startEnemyIndex) {
+    conditions.push(
+      state.draft.enemyHalfHpTriggered
+        ? `第 ${startEnemyIndex} 个敌人起：对手生命首次降至50%触发（本敌人已触发）`
+        : `第 ${startEnemyIndex} 个敌人起：对手生命首次降至50%触发（本敌人可触发）`
+    );
+  } else {
+    conditions.push(
+      `第 ${startEnemyIndex} 个敌人起：对手生命首次降至50%触发（当前第 ${state.enemyIndex} 个敌人，尚未生效）`
+    );
+  }
+  return conditions;
+});
+
+// 展示当前战中三选一品质权重（A/B/C）。
+const midDraftQualityWeightText = computed(() => {
+  const weights = state.draft.midDraftQualityWeights || {};
+  const format = (value) => Number(value || 0).toFixed(1);
+  return `A ${format(weights.A)} / B ${format(weights.B)} / C ${format(weights.C)}`;
+});
 </script>
 
 <template>
@@ -364,7 +392,7 @@ const preDraftSelectedCost = computed(() =>
             </button>
             <div v-if="state.chainMode">
               <div class="enemy-index-text">每击败 1 个敌人，下一名敌人额外获得：</div>
-              <div class="enemy-index-text">- 生命/攻击/防御倍率：+20%</div>
+              <div class="enemy-index-text">- 生命/攻击/防御倍率：首次 +5%，后续每次 +5%，上限 +15%</div>
               <div class="enemy-index-text">- 每回合回复：+1</div>
               <div class="enemy-index-text">- 暴击伤害倍率：+10%</div>
             </div>
@@ -535,6 +563,11 @@ const preDraftSelectedCost = computed(() =>
 
       <aside class="battle-side battle-side-right" aria-hidden="true">
         <div class="side-placeholder">
+          <p class="side-title">祝福三选一触发条件</p>
+          <p class="side-sub">当前品质权重：{{ midDraftQualityWeightText }}</p>
+          <ul class="build-list build-list-conditions">
+            <li v-for="item in midDraftTriggerConditions" :key="item">{{ item }}</li>
+          </ul>
           <p class="side-title">当前构筑</p>
           <p class="side-sub">祝福（{{ state.blessings.length }}）</p>
           <ul class="build-list">
@@ -613,6 +646,7 @@ const preDraftSelectedCost = computed(() =>
         </div>
         <div class="modal-body">
           <p>请选择一个祝福立即生效。</p>
+          <p>当前品质权重：{{ midDraftQualityWeightText }}</p>
           <div class="draft-cards">
             <button
               v-for="item in state.draft.midCandidates"
@@ -648,17 +682,18 @@ const preDraftSelectedCost = computed(() =>
         </div>
         <div class="modal-body">
           <p class="formula">
-            伤害 = clamp(0, 随机(技能威力) + 随机(攻击力 + 伤害加成) - 随机(防御力 + 护甲加成))
-            × 随机(状态倍率) × (是否暴击 ? 随机(暴击伤害倍率) : 1)
+            伤害 = [随机(技能威力) + 随机(攻击侧数值)] × 比例减伤
+            其中 比例减伤 = K / (K + max(0, 随机(防御侧数值)))，K = 50
           </p>
           <p class="formula">
-            命中判定：若 rand ≤ 闪避率 或 rand ≥ 技能命中率，则 伤害 = 0
+            结算顺序：max(0, 伤害) → 随机(伤害) → 随机(状态倍率) → 暴击倍率
+            （若暴击则再乘 随机(暴击伤害倍率)）
           </p>
           <p class="formula">
-            吸血 = 伤害 × 吸血比例（不超过最大生命）
+            命中判定：若 rand ≤ 闪避率 或 rand ≥ 技能命中率，则本次伤害 = 0
           </p>
           <p class="formula note">
-            说明：随机(x) 表示在随机倍率区间内取值；状态倍率来自强/弱状态，默认 1。
+            说明：吸血 = 最终伤害 × 吸血比例（不超过最大生命）；祝福会在伤害前后钩子中参与改写。
           </p>
         </div>
       </div>
@@ -949,6 +984,13 @@ h1 {
   flex-direction: column;
   align-items: flex-start;
   gap: 6px;
+}
+
+.build-list-conditions {
+  margin-top: 8px;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .side-log-panel {

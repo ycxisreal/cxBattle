@@ -55,6 +55,7 @@ const dialogVisible = ref(false);
 const selectVisible = ref(false);
 const skillPreviewVisible = ref(false);
 const strengthPreviewVisible = ref(false);
+const blessingPreviewVisible = ref(false);
 const dialogMode = ref("add");
 const selectMode = ref("edit");
 const dialogType = ref("units");
@@ -96,6 +97,87 @@ const strengthOptions = computed(() =>
     label: `#${item.id} ${item.name}`,
   }))
 );
+
+const blessingQualityRank = {
+  A: 3,
+  B: 2,
+  C: 1,
+};
+
+const blessingPreviewSortBy = ref("id");
+const blessingPreviewSortOrder = ref("asc");
+const blessingPreviewQualityFilter = ref("all");
+const blessingPreviewRepeatableFilter = ref("all");
+const blessingPreviewPage = ref(1);
+const blessingPreviewPageSize = ref(8);
+
+// 祝福预览数据标准化，确保排序与展示字段稳定。
+const normalizedBlessingsForPreview = computed(() =>
+  (customData.blessings || []).map((item) => ({
+    id: Number(item?.id || 0),
+    name: String(item?.name || ""),
+    quality: String(item?.quality || "C").toUpperCase(),
+    maxStack: Math.max(1, Number(item?.maxStack || 1)),
+    repeatable: Boolean(item?.repeatable),
+    desc: String(item?.desc || ""),
+  }))
+);
+
+// 按筛选条件过滤祝福预览列表。
+const filteredBlessingsForPreview = computed(() =>
+  normalizedBlessingsForPreview.value.filter((item) => {
+    const passQuality =
+      blessingPreviewQualityFilter.value === "all" ||
+      item.quality === blessingPreviewQualityFilter.value;
+    const passRepeatable =
+      blessingPreviewRepeatableFilter.value === "all" ||
+      (blessingPreviewRepeatableFilter.value === "repeatable" && item.repeatable) ||
+      (blessingPreviewRepeatableFilter.value === "single" && !item.repeatable);
+    return passQuality && passRepeatable;
+  })
+);
+
+// 按当前排序规则排序祝福预览列表。
+const sortedBlessingsForPreview = computed(() => {
+  const list = [...filteredBlessingsForPreview.value];
+  const orderFactor = blessingPreviewSortOrder.value === "desc" ? -1 : 1;
+  const sortBy = blessingPreviewSortBy.value;
+  list.sort((a, b) => {
+    if (sortBy === "name") {
+      return a.name.localeCompare(b.name, "zh-Hans-CN") * orderFactor;
+    }
+    if (sortBy === "quality") {
+      return (
+        (Number(blessingQualityRank[a.quality] || 0) -
+          Number(blessingQualityRank[b.quality] || 0)) * orderFactor
+      );
+    }
+    if (sortBy === "maxStack") {
+      return (a.maxStack - b.maxStack) * orderFactor;
+    }
+    return (a.id - b.id) * orderFactor;
+  });
+  return list;
+});
+
+const blessingPreviewTotal = computed(() => sortedBlessingsForPreview.value.length);
+
+// 对排序后的祝福列表进行分页裁剪。
+const pagedBlessingsForPreview = computed(() => {
+  const start = (blessingPreviewPage.value - 1) * blessingPreviewPageSize.value;
+  return sortedBlessingsForPreview.value.slice(start, start + blessingPreviewPageSize.value);
+});
+
+// 打开祝福预览弹窗并重置分页位置。
+const openBlessingPreview = () => {
+  blessingPreviewVisible.value = true;
+  blessingPreviewPage.value = 1;
+};
+
+// 排序或筛选变更后，将分页回到第一页避免空页。
+const resetBlessingPreviewPage = () => {
+  blessingPreviewPage.value = 1;
+};
 
 
 // 重置选择弹窗状态
@@ -490,6 +572,17 @@ const saveForm = async () => {
       ElMessage.warning("implKey 不能为空");
       return;
     }
+    // 校验祝福逻辑键唯一性：新增与编辑均不允许与其他祝福重复。
+    const duplicateImplKey = customData.blessings.some((item) => {
+      if (dialogMode.value === "edit" && Number(item.id) === Number(editingId.value)) {
+        return false;
+      }
+      return String(item.implKey || "").trim() === normalized.implKey;
+    });
+    if (duplicateImplKey) {
+      ElMessage.warning("implKey 已存在，请使用唯一键名");
+      return;
+    }
     if (!normalized.repeatable) {
       normalized.maxStack = 1;
     }
@@ -670,21 +763,26 @@ const removeListItem = (list, index) => {
         <p>新增、编辑与删除祝福数据。</p>
         <p class="warn-text">提示：修改祝福后需同步调整对应 implKey 的源码逻辑。</p>
         <div class="custom-actions">
-          <el-button size="small" :disabled="!isElectronEnv" @click="openAdd('blessings')">
-            添加
-          </el-button>
-          <el-button size="small" :disabled="!isElectronEnv" @click="openEdit('blessings')">
-            编辑
-          </el-button>
-          <el-button
-            size="small"
-            type="danger"
-            plain
-            :disabled="!isElectronEnv"
-            @click="openDelete('blessings')"
-          >
-            删除
-          </el-button>
+          <div>
+            <el-button size="small" @click="openBlessingPreview">
+              预览
+            </el-button>
+            <el-button size="small" :disabled="!isElectronEnv" @click="openAdd('blessings')">
+              添加
+            </el-button>
+            <el-button size="small" :disabled="!isElectronEnv" @click="openEdit('blessings')">
+              编辑
+            </el-button>
+            <el-button
+                size="small"
+                type="danger"
+                plain
+                :disabled="!isElectronEnv"
+                @click="openDelete('blessings')"
+            >
+              删除
+            </el-button>
+          </div>
         </div>
       </div>
     </div>
@@ -1215,6 +1313,68 @@ const removeListItem = (list, index) => {
         </div>
       </div>
     </el-dialog>
+
+    <el-dialog v-model="blessingPreviewVisible" title="祝福详情" width="960px">
+      <div class="details">
+        <div class="preview-toolbar">
+          <el-select
+            v-model="blessingPreviewSortBy"
+            style="width: 150px"
+            @change="resetBlessingPreviewPage"
+          >
+            <el-option label="按ID排序" value="id" />
+            <el-option label="按名称排序" value="name" />
+            <el-option label="按品质排序" value="quality" />
+            <el-option label="按最大层数排序" value="maxStack" />
+          </el-select>
+          <el-select
+            v-model="blessingPreviewSortOrder"
+            style="width: 120px"
+            @change="resetBlessingPreviewPage"
+          >
+            <el-option label="升序" value="asc" />
+            <el-option label="降序" value="desc" />
+          </el-select>
+          <el-select
+            v-model="blessingPreviewQualityFilter"
+            style="width: 130px"
+            @change="resetBlessingPreviewPage"
+          >
+            <el-option label="全部品质" value="all" />
+            <el-option label="A 品质" value="A" />
+            <el-option label="B 品质" value="B" />
+            <el-option label="C 品质" value="C" />
+          </el-select>
+          <el-select
+            v-model="blessingPreviewRepeatableFilter"
+            style="width: 150px"
+            @change="resetBlessingPreviewPage"
+          >
+            <el-option label="重复规则: 全部" value="all" />
+            <el-option label="仅可重复" value="repeatable" />
+            <el-option label="仅不可重复" value="single" />
+          </el-select>
+        </div>
+
+        <div v-if="!blessingPreviewTotal" class="empty-hint">暂无祝福数据</div>
+        <template v-else>
+          <el-table :data="pagedBlessingsForPreview" border stripe class="blessing-preview-table">
+            <el-table-column prop="name" label="名称" min-width="180" />
+            <el-table-column prop="maxStack" label="最大层数" width="120" />
+            <el-table-column prop="desc" label="描述" min-width="380" show-overflow-tooltip />
+          </el-table>
+          <div class="preview-pagination">
+            <el-pagination
+              v-model:current-page="blessingPreviewPage"
+              v-model:page-size="blessingPreviewPageSize"
+              layout="total, sizes, prev, pager, next, jumper"
+              :page-sizes="[5, 8, 10, 15, 20]"
+              :total="blessingPreviewTotal"
+            />
+          </div>
+        </template>
+      </div>
+    </el-dialog>
   </section>
 </template>
 
@@ -1464,7 +1624,24 @@ const removeListItem = (list, index) => {
 }
 .details{
   max-height: 75vh;
-  overflow: scroll;
+  overflow-y: scroll;
+}
+
+.preview-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.blessing-preview-table {
+  width: 100%;
+}
+
+.preview-pagination {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
 }
 
 @media (max-width: 768px) {
