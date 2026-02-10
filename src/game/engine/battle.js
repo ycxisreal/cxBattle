@@ -189,6 +189,7 @@ const calculateDamage = (
 
   return {
     damage,
+    criticalHit,
     isMissed: false,
     des: text,
   };
@@ -359,7 +360,16 @@ const applyChangeValue = (attacker, defender, rawSkill) => {
   return logs;
 };
 
-const executeStrength = (attacker, defender, round, addLog, onEvent, hookBridge) => {
+// 执行单位被动特长，并在结算中透传暴击/击杀钩子。
+const executeStrength = (
+  attacker,
+  defender,
+  round,
+  addLog,
+  onEvent,
+  hookBridge,
+  reportKill = null
+) => {
   for (const strengthId of attacker.strength || []) {
     const strength = strengths.find((item) => item.id === strengthId);
     if (!strength) continue;
@@ -405,8 +415,32 @@ const executeStrength = (attacker, defender, round, addLog, onEvent, hookBridge)
         sideLog: hookBridge?.sideLog,
         meta: {},
       });
+      if (msg.criticalHit) {
+        emitHook(hookBridge, "onCrit", {
+          session: hookBridge?.getSession?.(),
+          round,
+          actor: attacker,
+          target: defender,
+          skill,
+          damage: msg.damage,
+          isStrength: true,
+          criticalHit: true,
+          log: addLog,
+          sideLog: hookBridge?.sideLog,
+          meta: {},
+        });
+      }
       if (msg.damage > 0 && onEvent) {
         onEvent({ type: "hit" });
+      }
+      if (typeof reportKill === "function") {
+        reportKill({
+          skill,
+          damage: msg.damage,
+          isStrength: true,
+          criticalHit: Boolean(msg.criticalHit),
+          source: "strength_damage",
+        });
       }
       addLog(msg.des);
     }
@@ -423,6 +457,15 @@ const executeStrength = (attacker, defender, round, addLog, onEvent, hookBridge)
       changeLogs.forEach(addLog);
       if (changeLogs.length && onEvent) {
         onEvent({ type: "status" });
+      }
+      if (typeof reportKill === "function") {
+        reportKill({
+          skill,
+          damage: 0,
+          isStrength: true,
+          criticalHit: false,
+          source: "strength_change",
+        });
       }
     }
   }
@@ -542,6 +585,28 @@ export const executeSkill = (
     meta: {},
   });
   let isMissed = false;
+  let killEmitted = false;
+
+  // 检查目标是否被本次行动击杀，并发射 onKill 钩子（同一次行动仅触发一次）。
+  const emitKillIfNeeded = ({ skill, damage, isStrength, criticalHit, source }) => {
+    if (killEmitted) return;
+    if (!defender || defender.hp > 0) return;
+    killEmitted = true;
+    emitHook(hookBridge, "onKill", {
+      session: hookBridge?.getSession?.(),
+      round,
+      actor: attacker,
+      target: defender,
+      skill,
+      damage: Number.isFinite(damage) ? damage : 0,
+      isStrength: Boolean(isStrength),
+      criticalHit: Boolean(criticalHit),
+      source,
+      log: addLog,
+      sideLog: hookBridge?.sideLog,
+      meta: {},
+    });
+  };
 
   if (skill.power) {
     const damageInfo = calculateDamage(attacker, defender, skill, false, (ctx) => {
@@ -574,9 +639,31 @@ export const executeSkill = (
       sideLog: hookBridge?.sideLog,
       meta: {},
     });
+    if (damageInfo.criticalHit) {
+      emitHook(hookBridge, "onCrit", {
+        session: hookBridge?.getSession?.(),
+        round,
+        actor: attacker,
+        target: defender,
+        skill,
+        damage: damageInfo.damage,
+        isStrength: false,
+        criticalHit: true,
+        log: addLog,
+        sideLog: hookBridge?.sideLog,
+        meta: {},
+      });
+    }
     if (damageInfo.damage > 0 && onEvent) {
       onEvent({ type: "hit" });
     }
+    emitKillIfNeeded({
+      skill,
+      damage: damageInfo.damage,
+      isStrength: false,
+      criticalHit: Boolean(damageInfo.criticalHit),
+      source: "skill_damage",
+    });
     isMissed = damageInfo.isMissed;
   }
 
@@ -595,6 +682,13 @@ export const executeSkill = (
     if (changeLogs.length && onEvent) {
       onEvent({ type: "status" });
     }
+    emitKillIfNeeded({
+      skill,
+      damage: 0,
+      isStrength: false,
+      criticalHit: false,
+      source: "skill_change",
+    });
   }
 
   attacker.hp = Math.min(
@@ -602,7 +696,15 @@ export const executeSkill = (
     attacker.hpCount
   );
   if (attacker.strength?.length) {
-    executeStrength(attacker, defender, round, addLog, onEvent, hookBridge);
+    executeStrength(
+      attacker,
+      defender,
+      round,
+      addLog,
+      onEvent,
+      hookBridge,
+      emitKillIfNeeded
+    );
   }
 };
 

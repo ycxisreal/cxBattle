@@ -21,3 +21,14 @@ export const createHookBus = () => {
     },
   };
 };
+/*
+hook 节点
+- `onBattleStart` 战斗开始
+- `onBeforeAction` 行动开始前
+- `onRoundStart` 回合开始
+- `onBeforeDamage` 造成伤害前
+- `onAfterDamage` 造成伤害后
+- `onCrit` 暴击命中后
+- `onKill` 击杀目标后
+- `onRoundEnd` 回合结束
+* */
