@@ -35,6 +35,9 @@ const CHAIN_ENEMY_GROWTH_MAX_RATE = 0.15;
 const CHAIN_ENEMY_HEAL_BONUS_PER_KILL = 1;
 const CHAIN_ENEMY_CRIT_HURT_BONUS_PER_KILL = 0.1;
 const MID_DRAFT_HALF_HP_TRIGGER_START_ENEMY_INDEX = 5;
+const FIRST_ACTION_DELAY_MS = 350;
+const SECOND_ACTION_DELAY_MS = 650;
+const ROUND_END_DELAY_MS = 550;
 
 const DIFFICULTY_OPTIONS = [
   { key: "normal", label: "普通" },
@@ -232,10 +235,10 @@ export const useBattle = () => {
     log: [],
     sideLog: [],
     effects: {
-      playerHit: false,
-      enemyHit: false,
-      playerStatus: false,
-      enemyStatus: false,
+      playerHitToken: 0,
+      enemyHitToken: 0,
+      playerStatusToken: 0,
+      enemyStatusToken: 0,
     },
   });
 
@@ -604,17 +607,14 @@ export const useBattle = () => {
     return available[Math.floor(Math.random() * available.length)];
   };
 
+  // 战斗流程停顿函数：统一控制“行动前摇/两次行动间隔/回合结算前等待”的节奏。
+  // 以后如需调快或调慢手感，优先修改上方 *_DELAY_MS 常量，再看是否需要改这里。
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+  // 触发受击/状态动画：通过递增 token 驱动 UI 重播动画，避免布尔翻转丢帧。
   const triggerEffect = (target, type) => {
-    const key = `${target}${type}`;
-    state.effects[key] = false;
-    setTimeout(() => {
-      state.effects[key] = true;
-      setTimeout(() => {
-        state.effects[key] = false;
-      }, 1000);
-    }, 1000);
+    const key = `${target}${type}Token`;
+    state.effects[key] = Number(state.effects[key] || 0) + 1;
   };
 
   // 回合收尾：减少状态回合并推进回合计数。
@@ -702,7 +702,8 @@ export const useBattle = () => {
     const secondSkill = second === state.player ? playerSkill : enemySkill;
 
     state.activeTurn = first === state.player ? "player" : "enemy";
-    await sleep(350);
+    // 第一段停顿：展示先手方轮到谁行动。
+    await sleep(FIRST_ACTION_DELAY_MS);
     const firstResult = await act(
       first,
       first === state.player ? state.enemy : state.player,
@@ -710,7 +711,8 @@ export const useBattle = () => {
     );
     if (!state.over && !firstResult?.skipRemainingTurn) {
       state.activeTurn = second === state.player ? "player" : "enemy";
-      await sleep(650);
+      // 第二段停顿：两次行动之间的间隔。
+      await sleep(SECOND_ACTION_DELAY_MS);
       await act(
         second,
         second === state.player ? state.enemy : state.player,
@@ -718,7 +720,8 @@ export const useBattle = () => {
       );
     }
     if (!state.over) {
-      await sleep(550);
+      // 第三段停顿：回合收尾前预留日志与动画展示时间。
+      await sleep(ROUND_END_DELAY_MS);
       finalizeRound();
     }
     state.activeTurn = null;

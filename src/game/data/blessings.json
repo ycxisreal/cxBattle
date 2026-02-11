@@ -180,5 +180,159 @@
     "repeatable": false,
     "maxStack": 1,
     "tags": []
+  },
+  {
+    "id": 1017,
+    "name": "嗜血",
+    "quality": "C",
+    "cost": 2,
+    "desc": "造成伤害后，回复造成伤害的2%的血量。最高5层",
+    "implKey": "bloodthirst",
+    "repeatable": true,
+    "maxStack": 5,
+    "tags": []
+  },
+  {
+    "id": 1018,
+    "name": "浸血",
+    "quality": "B",
+    "cost": 4,
+    "desc": "浸血之身，提升5%暴击率，最大层数为4",
+    "implKey": "bloodletting",
+    "repeatable": true,
+    "maxStack": 4,
+    "tags": []
+  },
+  {
+    "id": 1019,
+    "name": "行刑者",
+    "quality": "A",
+    "cost": 5,
+    "desc": "主动技能造成伤害前，若敌人生命值低于30%，则本次伤害数值提升20%",
+    "implKey": "execute_low_hp_target",
+    "repeatable": false,
+    "maxStack": 1,
+    "tags": []
+  },
+  {
+    "id": 1020,
+    "name": "笨重狼牙棒",
+    "quality": "C",
+    "cost": 3,
+    "desc": "若你的暴击率低于50%，则使你的暴击率提升至50%，同时闪避率降为0%，暴击伤害倍率降低为1.25",
+    "implKey": "heavy_war_club",
+    "repeatable": false,
+    "maxStack": 1,
+    "tags": []
+  },
+  {
+    "id": 1021,
+    "name": "拖把粘屎",
+    "quality": "B",
+    "cost": 4,
+    "desc": "提升20%暴击伤害，最大提升100%",
+    "implKey": "crit_damage_increase",
+    "repeatable": true,
+    "maxStack": 5,
+    "tags": []
+  },
+  {
+    "id": 1022,
+    "name": "审时度势",
+    "quality": "C",
+    "cost": 2,
+    "desc": "造成伤害前，若敌人当前生命值比例低于玩家，则提升15%伤害，反之，则降低10%伤害",
+    "implKey": "hp_compare_damage_adjust",
+    "repeatable": false,
+    "maxStack": 1,
+    "tags": []
+  },
+  {
+    "id": 1023,
+    "name": "斩断节奏",
+    "quality": "B",
+    "cost": 5,
+    "desc": "暴击命中后，若敌人 speed 高于自己，则有80%概率使其停止行动一回合(stopRound+1)。",
+    "implKey": "break_enemy_turn_on_crit",
+    "repeatable": false,
+    "maxStack": 1,
+    "tags": []
+  },
+  {
+    "id": 1024,
+    "name": "毒液蛋糕",
+    "quality": "C",
+    "cost": 2,
+    "desc": "自身每回合回复-3(可减为负数)，增加6点护甲，最高5层",
+    "implKey": "venom_cake",
+    "repeatable": true,
+    "maxStack": 5,
+    "tags": []
+  },
+  {
+    "id": 1025,
+    "name": "重装甲",
+    "quality": "B",
+    "cost": 4,
+    "desc": "立刻为自己增加10回合的+10护甲状态，一次性祝福，不受层数影响",
+    "implKey": "heavy_armor",
+    "repeatable": true,
+    "maxStack": 100,
+    "tags": []
+  },
+  {
+    "id": 1026,
+    "name": "蜕变新生",
+    "quality": "B",
+    "cost": 4,
+    "desc": "为自己增加20%生命值与生命上限，但3回合无法行动",
+    "implKey": "renewal",
+    "repeatable": false,
+    "maxStack": 1,
+    "tags": []
+  },
+  {
+    "id": 1027,
+    "name": "溜冰鞋",
+    "quality": "C",
+    "cost": 3,
+    "desc": "为角色增加1.5点速度，最高5层，不会超过10点速度限制",
+    "implKey": "ice_skates",
+    "repeatable": true,
+    "maxStack": 5,
+    "tags": []
+  },
+  {
+    "id": 1028,
+    "name": "均衡大道-ATK",
+    "quality": "A",
+    "cost": 6,
+    "desc": "造成伤害时，有70%概率权衡双方攻击力，攻击力高的一方将分割2点攻击力给攻击力低的一方。",
+    "implKey": "balance_path_ATK",
+    "repeatable": false,
+    "maxStack": 1,
+    "tags": []
+  },
+  {
+    "id": 1029,
+    "name": "均衡大道-DEF",
+    "quality": "A",
+    "cost": 6,
+    "desc": "造成伤害时，有70%概率权衡双方防御力，防御力高的一方将分割2点防御力给防御力低的一方。",
+    "implKey": "balance_path_def",
+    "repeatable": false,
+    "maxStack": 1,
+    "tags": []
+  },
+  {
+    "id": 1030,
+    "name": "燃烧本源",
+    "quality": "A",
+    "cost": 6,
+    "desc": "造成伤害前，削减自己当前生命10%的生命值，其数值的1.2倍作为附加伤害。每多一层数值增加0.1",
+    "implKey": "burning_origin_sacrifice_damage",
+    "repeatable": true,
+    "maxStack": 5,
+    "tags": []
   }
 ]

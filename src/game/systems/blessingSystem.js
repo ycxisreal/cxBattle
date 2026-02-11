@@ -260,6 +260,266 @@ const createBlessingRegistry = () => ({
       instance.state.installed = true;
     },
   }),
+  // 造成伤害后按层数吸血（每层2%）。
+  bloodthirst: ({ state, blessingDef }) => ({
+    onAfterDamage(ctx) {
+      if (!isPlayerActor(ctx, state)) return;
+      const dealt = Number(ctx?.damage || 0);
+      if (dealt <= 0) return;
+      const stack = getBlessingStack(state, blessingDef.id);
+      const healed = healPlayer(state, Math.floor(dealt * 0.02 * stack));
+      if (healed > 0) {
+        outputBlessingLog(ctx, `[祝福] ${blessingDef.name}触发：吸血恢复${healed}点生命`);
+      }
+    },
+  }),
+  // 按层数提升暴击率（每层+5%）。
+  bloodletting: ({ state, blessingDef, instance }) => ({
+    onInstall() {
+      if (!state?.player) return;
+      const stack = getBlessingStack(state, blessingDef.id);
+      const appliedStack = Number(instance.state.appliedStack || 0);
+      if (stack <= appliedStack) return;
+      const deltaStack = stack - appliedStack;
+      state.player.criticalRate = Math.min(
+        1,
+        Number(state.player.criticalRate || 0) + 0.05 * deltaStack
+      );
+      instance.state.appliedStack = stack;
+    },
+    onRoundStart() {
+      if (!state?.player) return;
+      const stack = getBlessingStack(state, blessingDef.id);
+      const appliedStack = Number(instance.state.appliedStack || 0);
+      if (stack <= appliedStack) return;
+      const deltaStack = stack - appliedStack;
+      state.player.criticalRate = Math.min(
+        1,
+        Number(state.player.criticalRate || 0) + 0.05 * deltaStack
+      );
+      instance.state.appliedStack = stack;
+    },
+  }),
+  // 对低血量目标造成伤害前增伤（主动技能生效）。
+  execute_low_hp_target: ({ state, blessingDef }) => ({
+    onBeforeDamage(ctx) {
+      if (!isPlayerActor(ctx, state) || ctx?.isStrength) return;
+      if (!ctx?.target || !Number.isFinite(ctx.damage)) return;
+      const hpCount = Number(ctx.target.hpCount || 0);
+      if (hpCount <= 0) return;
+      const hpRate = Number(ctx.target.hp || 0) / hpCount;
+      if (hpRate >= 0.3) return;
+      ctx.damage *= 1.2;
+      outputBlessingLog(ctx, `[祝福] ${blessingDef.name}触发：对低血量目标伤害+20%`);
+    },
+  }),
+  // 安装时强制修正暴击/闪避/暴击伤害。
+  heavy_war_club: ({ state, instance }) => ({
+    onInstall() {
+      if (!state?.player || instance.state.installed) return;
+      state.player.criticalRate = Math.max(0.5, Number(state.player.criticalRate || 0));
+      state.player.missRate = 0;
+      state.player.criticalHurtRate = 1.25;
+      instance.state.installed = true;
+    },
+  }),
+  // 按层提升暴击伤害倍率（每层+0.2）。
+  crit_damage_increase: ({ state, blessingDef, instance }) => ({
+    onInstall() {
+      if (!state?.player) return;
+      const stack = getBlessingStack(state, blessingDef.id);
+      const appliedStack = Number(instance.state.appliedStack || 0);
+      if (stack <= appliedStack) return;
+      const deltaStack = stack - appliedStack;
+      state.player.criticalHurtRate = Number(state.player.criticalHurtRate || 1) + 0.2 * deltaStack;
+      instance.state.appliedStack = stack;
+    },
+    onRoundStart() {
+      if (!state?.player) return;
+      const stack = getBlessingStack(state, blessingDef.id);
+      const appliedStack = Number(instance.state.appliedStack || 0);
+      if (stack <= appliedStack) return;
+      const deltaStack = stack - appliedStack;
+      state.player.criticalHurtRate = Number(state.player.criticalHurtRate || 1) + 0.2 * deltaStack;
+      instance.state.appliedStack = stack;
+    },
+  }),
+  // 伤害前比较双方生命比例并调整伤害。
+  hp_compare_damage_adjust: ({ state, blessingDef }) => ({
+    onBeforeDamage(ctx) {
+      if (!isPlayerActor(ctx, state)) return;
+      if (!ctx?.target || !Number.isFinite(ctx.damage)) return;
+      const playerHpRate =
+        Number(state.player.hpCount || 0) > 0
+          ? Number(state.player.hp || 0) / Number(state.player.hpCount || 1)
+          : 0;
+      const enemyHpRate =
+        Number(ctx.target.hpCount || 0) > 0
+          ? Number(ctx.target.hp || 0) / Number(ctx.target.hpCount || 1)
+          : 0;
+      if (enemyHpRate < playerHpRate) {
+        ctx.damage *= 1.15;
+        outputBlessingLog(ctx, `[祝福] ${blessingDef.name}触发：伤害提升15%`);
+        return;
+      }
+      ctx.damage *= 0.9;
+      outputBlessingLog(ctx, `[祝福] ${blessingDef.name}触发：伤害降低10%`);
+    },
+  }),
+  // 暴击命中更快目标时，概率使其停止行动1回合。
+  break_enemy_turn_on_crit: ({ state, blessingDef }) => ({
+    onCrit(ctx) {
+      if (!isPlayerActor(ctx, state)) return;
+      if (!ctx?.target || Number(ctx.target.hp || 0) <= 0) return;
+      if (Number(ctx.target.speed || 0) <= Number(state.player.speed || 0)) return;
+      if (Math.random() > 0.8) return;
+      ctx.target.stopRound = Number(ctx.target.stopRound || 0) + 1;
+      outputBlessingLog(ctx, `[祝福] ${blessingDef.name}触发：敌人停止行动1回合`);
+    },
+  }),
+  // 按层数提升护甲并降低每回合回复。
+  venom_cake: ({ state, blessingDef, instance }) => ({
+    onInstall() {
+      if (!state?.player) return;
+      const stack = getBlessingStack(state, blessingDef.id);
+      const appliedStack = Number(instance.state.appliedStack || 0);
+      if (stack <= appliedStack) return;
+      const deltaStack = stack - appliedStack;
+      state.player.defence = Number(state.player.defence || 0) + 6 * deltaStack;
+      state.player.healPerRound = Number(state.player.healPerRound || 0) - 3 * deltaStack;
+      instance.state.appliedStack = stack;
+    },
+    onRoundStart() {
+      if (!state?.player) return;
+      const stack = getBlessingStack(state, blessingDef.id);
+      const appliedStack = Number(instance.state.appliedStack || 0);
+      if (stack <= appliedStack) return;
+      const deltaStack = stack - appliedStack;
+      state.player.defence = Number(state.player.defence || 0) + 6 * deltaStack;
+      state.player.healPerRound = Number(state.player.healPerRound || 0) - 3 * deltaStack;
+      instance.state.appliedStack = stack;
+    },
+  }),
+  // 获得时立刻叠加10回合护甲状态，可随层数追加。
+  heavy_armor: ({ state, blessingDef, instance }) => ({
+    onInstall() {
+      if (!state?.player) return;
+      const stack = getBlessingStack(state, blessingDef.id);
+      const appliedStack = Number(instance.state.appliedStack || 0);
+      if (stack <= appliedStack) return;
+      const deltaStack = stack - appliedStack;
+      const current = state.player.armorStatus || { round: 0, value: 0 };
+      state.player.armorStatus = {
+        round: 10,
+        value: Number(current.value || 0) + 10 * deltaStack,
+      };
+      instance.state.appliedStack = stack;
+    },
+    onRoundStart() {
+      if (!state?.player) return;
+      const stack = getBlessingStack(state, blessingDef.id);
+      const appliedStack = Number(instance.state.appliedStack || 0);
+      if (stack <= appliedStack) return;
+      const deltaStack = stack - appliedStack;
+      const current = state.player.armorStatus || { round: 0, value: 0 };
+      state.player.armorStatus = {
+        round: 10,
+        value: Number(current.value || 0) + 10 * deltaStack,
+      };
+      instance.state.appliedStack = stack;
+    },
+  }),
+  // 安装时提升生命值与生命上限20%，并使自己停止行动3回合。
+  renewal: ({ state, instance }) => ({
+    onInstall() {
+      if (!state?.player || instance.state.installed) return;
+      state.player.hpCount = Number(state.player.hpCount || 0) * 1.2;
+      state.player.hp = Math.min(
+        Number(state.player.hp || 0) * 1.2,
+        Number(state.player.hpCount || 0)
+      );
+      state.player.stopRound = Number(state.player.stopRound || 0) + 3;
+      instance.state.installed = true;
+    },
+  }),
+  // 按层数提升速度（每层+1.5，最高10）。
+  ice_skates: ({ state, blessingDef, instance }) => ({
+    onInstall() {
+      if (!state?.player) return;
+      if (!Number.isFinite(instance.state.baseSpeed)) {
+        instance.state.baseSpeed = Number(state.player.speed || 0);
+      }
+      const stack = getBlessingStack(state, blessingDef.id);
+      state.player.speed = Math.min(10, Number(instance.state.baseSpeed || 0) + 1.5 * stack);
+    },
+    onRoundStart() {
+      if (!state?.player) return;
+      if (!Number.isFinite(instance.state.baseSpeed)) {
+        instance.state.baseSpeed = Number(state.player.speed || 0);
+      }
+      const stack = getBlessingStack(state, blessingDef.id);
+      state.player.speed = Math.min(10, Number(instance.state.baseSpeed || 0) + 1.5 * stack);
+    },
+  }),
+  // 伤害后有概率均衡双方攻击力：高者向低者分出2点。
+  balance_path_ATK: ({ state, blessingDef }) => ({
+    onAfterDamage(ctx) {
+      if (!isPlayerActor(ctx, state)) return;
+      if (!ctx?.target || Number(ctx?.damage || 0) <= 0) return;
+      if (Math.random() > 0.7) return;
+      const playerAtk = Number(state.player.attack || 0);
+      const enemyAtk = Number(ctx.target.attack || 0);
+      if (playerAtk === enemyAtk) return;
+      if (playerAtk > enemyAtk) {
+        state.player.attack = Math.max(0, playerAtk - 2);
+        ctx.target.attack = enemyAtk + 2;
+      } else {
+        state.player.attack = playerAtk + 2;
+        ctx.target.attack = Math.max(0, enemyAtk - 2);
+      }
+      outputBlessingLog(ctx, `[祝福] ${blessingDef.name}触发：双方攻击力趋于均衡`);
+    },
+  }),
+  // 伤害后有概率均衡双方防御力：高者向低者分出2点。
+  balance_path_def: ({ state, blessingDef }) => ({
+    onAfterDamage(ctx) {
+      if (!isPlayerActor(ctx, state)) return;
+      if (!ctx?.target || Number(ctx?.damage || 0) <= 0) return;
+      if (Math.random() > 0.7) return;
+      const playerDef = Number(state.player.defence || 0);
+      const enemyDef = Number(ctx.target.defence || 0);
+      if (playerDef === enemyDef) return;
+      if (playerDef > enemyDef) {
+        state.player.defence = playerDef - 2;
+        ctx.target.defence = enemyDef + 2;
+      } else {
+        state.player.defence = playerDef + 2;
+        ctx.target.defence = enemyDef - 2;
+      }
+      outputBlessingLog(ctx, `[祝福] ${blessingDef.name}触发：双方防御力趋于均衡`);
+    },
+  }),
+  // 伤害前献祭当前生命值的10%，将其按层数转化为附加伤害。
+  burning_origin_sacrifice_damage: ({ state, blessingDef }) => ({
+    onBeforeDamage(ctx) {
+      if (!isPlayerActor(ctx, state)) return;
+      if (!Number.isFinite(ctx.damage)) return;
+      const currentHp = Number(state.player.hp || 0);
+      if (currentHp <= 1) return;
+      const stack = getBlessingStack(state, blessingDef.id);
+      const sacrifice = Math.min(currentHp - 1, Math.floor(currentHp * 0.1));
+      if (sacrifice <= 0) return;
+      state.player.hp = currentHp - sacrifice;
+      const ratio = 1.2 + (stack - 1) * 0.1;
+      const bonusDamage = Math.floor(sacrifice * ratio);
+      if (bonusDamage <= 0) return;
+      ctx.damage += bonusDamage;
+      outputBlessingLog(
+        ctx,
+        `[祝福] ${blessingDef.name}触发：献祭${sacrifice}生命，追加${bonusDamage}点伤害`
+      );
+    },
+  }),
 });
 
 // 根据祝福定义创建运行时实例（BlessingInstance）。

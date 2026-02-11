@@ -14,7 +14,6 @@ const {
   playerSkills,
   availableUnits,
   difficultyOptions,
-  pointsRemaining,
   resetBattle,
   setDifficulty,
   toggleChainMode,
@@ -34,6 +33,7 @@ const unitPage = ref(0);
 const showUnitModal = ref(false);
 const skillPage = ref(0);
 const selectedSkillIds = ref([]);
+const autoSkillIds = ref([]);
 const showSkillPool = ref(false);
 const sidebarTabs = [
   {
@@ -128,6 +128,8 @@ const closeUnitModal = () => {
 const startBattle = () => {
   if (!selectedUnitId.value) return;
   startBattleWithSelection(selectedUnitId.value);
+  // 进入战斗时从技能池随机抽取4个作为默认出招栏。
+  autoSkillIds.value = pickRandomSkillIds(playerSkills.value, 4);
   skillPage.value = 0;
   selectedSkillIds.value = [];
   showSkillPool.value = false;
@@ -139,13 +141,28 @@ const skipRound = () => {
 
 const handleResetBattle = () => {
   resetBattle();
+  // 重置战斗后重新随机默认出招栏，保持与手动4选一致的效果。
+  autoSkillIds.value = pickRandomSkillIds(playerSkills.value, 4);
   skillPage.value = 0;
+  selectedSkillIds.value = [];
   showSkillPool.value = false;
 };
 
 const handleBackToSelect = () => {
   backToSelect();
   selectedUnitId.value = state.selectedPlayerId;
+  autoSkillIds.value = [];
+  selectedSkillIds.value = [];
+};
+
+// 从技能池中随机抽取指定数量的技能ID（不重复）。
+const pickRandomSkillIds = (skillPool, count = 4) => {
+  const ids = (skillPool || []).map((skill) => skill.id).filter(Boolean);
+  for (let i = ids.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+  }
+  return ids.slice(0, Math.min(Math.max(0, count), ids.length));
 };
 
 const visibleSkills = computed(() => {
@@ -153,6 +170,10 @@ const visibleSkills = computed(() => {
     .map((id) => playerSkills.value.find((skill) => skill.id === id))
     .filter(Boolean);
   if (selected.length) return selected;
+  const autoSelected = autoSkillIds.value
+    .map((id) => playerSkills.value.find((skill) => skill.id === id))
+    .filter(Boolean);
+  if (autoSelected.length) return autoSelected;
   return playerSkills.value.slice(0, 4);
 });
 
@@ -234,6 +255,10 @@ const preDraftSelectedCost = computed(() =>
   state.draft.preCandidates
     .filter((item) => state.draft.selectedPreIds.includes(item.draftId))
     .reduce((sum, item) => sum + Number(item.cost || 0), 0)
+);
+const displayPointsUsed = computed(() => Number(state.pointsUsed || 0) + preDraftSelectedCost.value);
+const displayPointsRemaining = computed(() =>
+  Math.max(0, Number(state.pointsTotal || 0) - displayPointsUsed.value)
 );
 
 // 展示战中祝福三选一触发条件与当前生效状态。
@@ -415,8 +440,8 @@ const midDraftQualityWeightText = computed(() => {
             :unit="state.player"
             theme="player"
             :active="state.activeTurn === 'player'"
-            :hit="state.effects.playerHit"
-            :status="state.effects.playerStatus"
+            :hit-token="state.effects.playerHitToken"
+            :status-token="state.effects.playerStatusToken"
             :strengths="strengths"
           />
           <div class="center-panel">
@@ -469,8 +494,8 @@ const midDraftQualityWeightText = computed(() => {
             :unit="state.enemy"
             theme="enemy"
             :active="state.activeTurn === 'enemy'"
-            :hit="state.effects.enemyHit"
-            :status="state.effects.enemyStatus"
+            :hit-token="state.effects.enemyHitToken"
+            :status-token="state.effects.enemyStatusToken"
             :strengths="strengths"
           />
         </section>
@@ -600,7 +625,7 @@ const midDraftQualityWeightText = computed(() => {
           <h4>战前构筑（6选）</h4>
         </div>
         <div class="modal-body">
-          <p>总点数 {{ state.pointsTotal }}，已用 {{ state.pointsUsed }}，剩余 {{ pointsRemaining }}</p>
+          <p>总点数 {{ state.pointsTotal }}，已用 {{ displayPointsUsed }}，剩余 {{ displayPointsRemaining }}</p>
           <div class="draft-cards">
             <button
               v-for="item in state.draft.preCandidates"

@@ -1,13 +1,13 @@
 <script setup>
-import { computed, ref } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 
 const props = defineProps({
   title: { type: String, required: true },
   unit: { type: Object, default: null },
   theme: { type: String, default: "player" },
   active: { type: Boolean, default: false },
-  hit: { type: Boolean, default: false },
-  status: { type: Boolean, default: false },
+  hitToken: { type: Number, default: 0 },
+  statusToken: { type: Number, default: 0 },
   strengths: { type: Array, default: () => [] },
 });
 
@@ -51,6 +51,60 @@ const strengthInfo = computed(() => {
     .filter(Boolean);
 });
 
+const cardRef = ref(null);
+const hitAnimation = ref(null);
+const statusAnimation = ref(null);
+
+// 直接在卡片元素上播放受击抖动，确保每次 token 更新都能稳定重播。
+const playHitAnimation = () => {
+  const el = cardRef.value;
+  if (!el?.animate) return;
+  if (hitAnimation.value) hitAnimation.value.cancel();
+  hitAnimation.value = el.animate(
+    [
+      { transform: "translateX(0)" },
+      { transform: "translateX(-12px)" },
+      { transform: "translateX(12px)" },
+      { transform: "translateX(-6px)" },
+      { transform: "translateX(0)" },
+    ],
+    { duration: 360, easing: "ease" }
+  );
+};
+
+// 状态反馈使用外发光脉冲，避免与抖动 transform 互相覆盖。
+const playStatusAnimation = () => {
+  const el = cardRef.value;
+  if (!el?.animate) return;
+  if (statusAnimation.value) statusAnimation.value.cancel();
+  statusAnimation.value = el.animate(
+    [
+      { boxShadow: "0 0 0 0 rgba(126, 107, 255, 0.45)" },
+      { boxShadow: "0 0 0 16px rgba(126, 107, 255, 0)" },
+    ],
+    { duration: 420, easing: "ease-out" }
+  );
+};
+
+watch(
+  () => props.hitToken,
+  () => {
+    playHitAnimation();
+  }
+);
+
+watch(
+  () => props.statusToken,
+  () => {
+    playStatusAnimation();
+  }
+);
+
+onBeforeUnmount(() => {
+  if (hitAnimation.value) hitAnimation.value.cancel();
+  if (statusAnimation.value) statusAnimation.value.cancel();
+});
+
 const showStrengthModal = ref(false);
 
 const formatCondition = (condition) => {
@@ -90,7 +144,7 @@ const formatCondition = (condition) => {
 </script>
 
 <template>
-  <article class="unit-card" :class="[theme, { active, hit, status }]">
+  <article ref="cardRef" class="unit-card" :class="[theme, { active }]">
     <header>
       <p class="label">{{ title }}</p>
       <h2>{{ unit?.name || "--" }}</h2>
@@ -140,6 +194,10 @@ const formatCondition = (condition) => {
       <li>
         <span>每回合回复</span>
         <strong>{{ unit?.healPerRound?.toFixed(1) || 0 }}</strong>
+      </li>
+      <li>
+        <span>暴击伤害倍率</span>
+        <strong>{{ ((unit?.criticalHurtRate ?? 0) * 100).toFixed(0) }}%</strong>
       </li>
     </ul>
     <div class="strengths">
@@ -214,41 +272,6 @@ const formatCondition = (condition) => {
   box-shadow: 0 0 0 1px rgba(110, 205, 255, 0.4),
     0 20px 40px rgba(56, 120, 255, 0.25);
   transform: translateY(-2px);
-}
-
-.unit-card.hit {
-  animation: hitShake 0.35s ease;
-}
-
-.unit-card.status {
-  animation: statusPulse 0.4s ease;
-}
-
-@keyframes hitShake {
-  0% {
-    transform: translateX(0);
-  }
-  25% {
-    transform: translateX(-12px);
-  }
-  50% {
-    transform: translateX(12px);
-  }
-  75% {
-    transform: translateX(-6px);
-  }
-  100% {
-    transform: translateX(0);
-  }
-}
-
-@keyframes statusPulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(126, 107, 255, 0.45);
-  }
-  100% {
-    box-shadow: 0 0 0 16px rgba(126, 107, 255, 0);
-  }
 }
 
 .label {
