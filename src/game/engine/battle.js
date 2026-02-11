@@ -430,8 +430,21 @@ const executeStrength = (
           meta: {},
         });
       }
+      if (onEvent && msg.isMissed) {
+        onEvent({
+          type: "miss",
+          damage: 0,
+          criticalHit: false,
+          isStrength: true,
+        });
+      }
       if (msg.damage > 0 && onEvent) {
-        onEvent({ type: "hit" });
+        onEvent({
+          type: "hit",
+          damage: Math.max(0, Math.floor(Number(msg.damage || 0))),
+          criticalHit: Boolean(msg.criticalHit),
+          isStrength: true,
+        });
       }
       if (typeof reportKill === "function") {
         reportKill({
@@ -654,8 +667,21 @@ export const executeSkill = (
         meta: {},
       });
     }
+    if (onEvent && damageInfo.isMissed) {
+      onEvent({
+        type: "miss",
+        damage: 0,
+        criticalHit: false,
+        isStrength: false,
+      });
+    }
     if (damageInfo.damage > 0 && onEvent) {
-      onEvent({ type: "hit" });
+      onEvent({
+        type: "hit",
+        damage: Math.max(0, Math.floor(Number(damageInfo.damage || 0))),
+        criticalHit: Boolean(damageInfo.criticalHit),
+        isStrength: false,
+      });
     }
     emitKillIfNeeded({
       skill,

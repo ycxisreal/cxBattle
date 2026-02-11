@@ -442,6 +442,9 @@ const midDraftQualityWeightText = computed(() => {
             :active="state.activeTurn === 'player'"
             :hit-token="state.effects.playerHitToken"
             :status-token="state.effects.playerStatusToken"
+            :float-token="state.effects.playerFloatToken"
+            :float-text="state.effects.playerFloatText"
+            :float-config="state.effects.playerFloatConfig"
             :strengths="strengths"
           />
           <div class="center-panel">
@@ -496,6 +499,9 @@ const midDraftQualityWeightText = computed(() => {
             :active="state.activeTurn === 'enemy'"
             :hit-token="state.effects.enemyHitToken"
             :status-token="state.effects.enemyStatusToken"
+            :float-token="state.effects.enemyFloatToken"
+            :float-text="state.effects.enemyFloatText"
+            :float-config="state.effects.enemyFloatConfig"
             :strengths="strengths"
           />
         </section>

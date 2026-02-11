@@ -15,7 +15,10 @@ import {
   executeSkill,
   reduceRound,
 } from "./engine/battle.js";
-import { installBlessing } from "./systems/blessingSystem.js";
+import {
+  installBlessing,
+  refreshBlessingOnStackChange,
+} from "./systems/blessingSystem.js";
 import { applyEquipmentsToUnit } from "./systems/equipmentSystem.js";
 import {
   buildMidDraftCandidates,
@@ -35,9 +38,24 @@ const CHAIN_ENEMY_GROWTH_MAX_RATE = 0.15;
 const CHAIN_ENEMY_HEAL_BONUS_PER_KILL = 1;
 const CHAIN_ENEMY_CRIT_HURT_BONUS_PER_KILL = 0.1;
 const MID_DRAFT_HALF_HP_TRIGGER_START_ENEMY_INDEX = 5;
-const FIRST_ACTION_DELAY_MS = 350;
-const SECOND_ACTION_DELAY_MS = 650;
-const ROUND_END_DELAY_MS = 550;
+const FIRST_ACTION_DELAY_MS = 800;
+const SECOND_ACTION_DELAY_MS = 800;
+const ROUND_END_DELAY_MS = 1000;
+const CRIT_FLOAT_TRIGGER_RATE = 0.75;
+const CRIT_PAIN_TEXT_POOL = [
+  "嘶...好疼！",
+  "这一下真重！",
+  "可恶，被打中了！",
+  "痛痛痛！",
+  "差点站不稳！",
+];
+const CRIT_TAUNT_TEXT_POOL = [
+  "就这？再来！",
+  "看到差距了吗？",
+  "这才叫暴击！",
+  "你防不住我。",
+  "继续挣扎吧。",
+];
 
 const DIFFICULTY_OPTIONS = [
   { key: "normal", label: "普通" },
@@ -96,6 +114,12 @@ const DIFFICULTY_CONFIG = {
 };
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
+// 中文注释：从文本池里随机挑选一条文案，用于浮字输出。
+const pickRandomText = (pool, fallback = "") => {
+  if (!Array.isArray(pool) || !pool.length) return fallback;
+  return String(pool[Math.floor(Math.random() * pool.length)] || fallback);
+};
 
 // 连战生命/攻击/防御成长率：首次5%，之后每击杀+5%，最高15%。
 const getChainEnemyGrowthRate = (growthLevel = 0) => {
@@ -239,6 +263,12 @@ export const useBattle = () => {
       enemyHitToken: 0,
       playerStatusToken: 0,
       enemyStatusToken: 0,
+      playerFloatToken: 0,
+      enemyFloatToken: 0,
+      playerFloatText: "",
+      enemyFloatText: "",
+      playerFloatConfig: {},
+      enemyFloatConfig: {},
     },
   });
 
@@ -382,6 +412,11 @@ export const useBattle = () => {
         return { ok: false, message: `${blessingDef.name}已达最大层数` };
       }
       existed.stack = Number(existed.stack || 1) + 1;
+      // 中文注释：叠层后立刻刷新祝福的叠层增益，确保卡片属性实时更新。
+      refreshBlessingOnStackChange({
+        blessing: existed,
+        state,
+      });
       return { ok: true, stacked: true };
     }
     const instance = installBlessing({
@@ -617,6 +652,21 @@ export const useBattle = () => {
     state.effects[key] = Number(state.effects[key] || 0) + 1;
   };
 
+  // 中文注释：触发卡片浮字（支持大小/位置/时长/缓动/动画预设/样式预设等配置）。
+  // 参数可传 string（仅文本）或对象：
+  // { text, size, x, y, duration, easing, animation, style, distance, keyframes }
+  const triggerFloatingText = (target, payload) => {
+    const tokenKey = `${target}FloatToken`;
+    const textKey = `${target}FloatText`;
+    const configKey = `${target}FloatConfig`;
+    const parsed = typeof payload === "string" ? { text: payload } : { ...(payload || {}) };
+    state.effects[textKey] = String(parsed.text || "");
+    state.effects[configKey] = {
+      ...parsed,
+    };
+    state.effects[tokenKey] = Number(state.effects[tokenKey] || 0) + 1;
+  };
+
   // 回合收尾：减少状态回合并推进回合计数。
   const finalizeRound = () => {
     emitBattleHook("onRoundEnd");
@@ -659,7 +709,20 @@ export const useBattle = () => {
       log(`${attacker.owner}没有可用招式`);
       return { skipRemainingTurn: false };
     }
+    const attackerSide = attacker === state.player ? "player" : "enemy";
     const defenderSide = defender === state.player ? "player" : "enemy";
+    // 中文注释：行动开始时在出招方卡片显示技能名浮字提示（可配置样式与动画）。
+    triggerFloatingText(attackerSide, {
+      text: skill.name,
+      style: "skill",
+      animation: "floatUp",
+      size: 20,
+      y: 75,
+      x:'75%',
+      duration: 3000,
+      easing: "cubic-bezier(0.2, 0.65, 0.22, 1)",
+      distance: 30,
+    });
     executeSkill(
       attacker,
       defender,
@@ -669,9 +732,46 @@ export const useBattle = () => {
       (event) => {
         if (event.type === "hit") {
           triggerEffect(defenderSide, "Hit");
+          // 中文注释：造成伤害时在受击方显示伤害数字浮字。
+          triggerFloatingText(defenderSide, {
+            text: `-${Math.max(0, Number(event?.damage || 0))}`,
+            style: "damage",
+            animation: event?.criticalHit ? "riseFast" : "floatUp",
+            size: event?.criticalHit ? 17 : 14,
+            distance: event?.criticalHit ? 24 : 18,
+            y: 12,
+          });
+          // 中文注释：暴击时双方各有75%概率触发文案浮字（受击吃痛/攻击嘲讽）。
+          if (event?.criticalHit) {
+            if (Math.random() < CRIT_FLOAT_TRIGGER_RATE) {
+              triggerFloatingText(defenderSide, {
+                text: pickRandomText(CRIT_PAIN_TEXT_POOL, "好痛！"),
+                style: "damage",
+                animation: "driftLeft",
+                y: 34,
+              });
+            }
+            if (Math.random() < CRIT_FLOAT_TRIGGER_RATE) {
+              triggerFloatingText(attackerSide, {
+                text: pickRandomText(CRIT_TAUNT_TEXT_POOL, "太弱了。"),
+                style: "taunt",
+                animation: "driftRight",
+                y: 34,
+              });
+            }
+          }
         }
         if (event.type === "status") {
           triggerEffect(defenderSide, "Status");
+        }
+        if (event.type === "miss") {
+          // 中文注释：闪避事件时，在防守方显示“闪避”浮字。
+          triggerFloatingText(defenderSide, {
+            text: "闪避",
+            style: "buff",
+            animation: "pop",
+            y: 12,
+          });
         }
       },
       {

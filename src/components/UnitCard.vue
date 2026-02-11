@@ -8,6 +8,9 @@ const props = defineProps({
   active: { type: Boolean, default: false },
   hitToken: { type: Number, default: 0 },
   statusToken: { type: Number, default: 0 },
+  floatToken: { type: Number, default: 0 },
+  floatText: { type: String, default: "" },
+  floatConfig: { type: Object, default: () => ({}) },
   strengths: { type: Array, default: () => [] },
 });
 
@@ -54,6 +57,33 @@ const strengthInfo = computed(() => {
 const cardRef = ref(null);
 const hitAnimation = ref(null);
 const statusAnimation = ref(null);
+const floatingItems = ref([]);
+const floatAnimationMap = new Map();
+
+const DEFAULT_FLOAT_CONFIG = Object.freeze({
+  style: "skill",
+  animation: "floatUp",
+  size: 20,
+  y: 75,
+  x:'75%',
+  duration: 3000,
+  easing: "cubic-bezier(0.2, 0.65, 0.22, 1)",
+  distance: 30,
+});
+
+const toCssLength = (value, fallbackPx = 0) => {
+  if (value == null) return `${fallbackPx}px`;
+  if (typeof value === "number") return `${value}px`;
+  return String(value);
+};
+
+const buildFloatStyle = (cfg) => ({
+  left: toCssLength(cfg.x, 50),
+  top: toCssLength(cfg.y, 10),
+  fontSize: toCssLength(cfg.size, 12),
+});
+
+const buildFloatClass = (cfg) => `style-${String(cfg.style || "skill")}`;
 
 // 直接在卡片元素上播放受击抖动，确保每次 token 更新都能稳定重播。
 const playHitAnimation = () => {
@@ -63,12 +93,12 @@ const playHitAnimation = () => {
   hitAnimation.value = el.animate(
     [
       { transform: "translateX(0)" },
-      { transform: "translateX(-12px)" },
-      { transform: "translateX(12px)" },
-      { transform: "translateX(-6px)" },
+      { transform: "translateX(-16px)" },
+      { transform: "translateX(16px)" },
+      { transform: "translateX(-8px)" },
       { transform: "translateX(0)" },
     ],
-    { duration: 360, easing: "ease" }
+    { duration: 750, easing: "ease" }
   );
 };
 
@@ -80,11 +110,116 @@ const playStatusAnimation = () => {
   statusAnimation.value = el.animate(
     [
       { boxShadow: "0 0 0 0 rgba(126, 107, 255, 0.45)" },
-      { boxShadow: "0 0 0 16px rgba(126, 107, 255, 0)" },
+      { boxShadow: "0 0 0 24px rgba(126, 107, 255, 0)" },
     ],
-    { duration: 420, easing: "ease-out" }
+    { duration: 750, easing: "ease-out" }
   );
 };
+
+// 中文注释：根据配置生成浮字关键帧；支持动画预设或自定义 keyframes。
+const buildFloatKeyframes = (cfg) => {
+  if (Array.isArray(cfg.keyframes) && cfg.keyframes.length) {
+    return cfg.keyframes;
+  }
+  const distance = Number(cfg.distance || 18);
+  switch (cfg.animation) {
+    case "pop":
+      return [
+        { opacity: 0, transform: "translate(-50%, 0) scale(0.7)" },
+        { opacity: 1, transform: "translate(-50%, -4px) scale(1.12)" },
+        { opacity: 0, transform: "translate(-50%, -12px) scale(1)" },
+      ];
+    case "driftLeft":
+      return [
+        { opacity: 0, transform: "translate(-40%, 10px) scale(0.98)" },
+        { opacity: 1, transform: "translate(-50%, -2px) scale(1)" },
+        { opacity: 0, transform: "translate(-62%, -16px) scale(1.02)" },
+      ];
+    case "driftRight":
+      return [
+        { opacity: 0, transform: "translate(-60%, 10px) scale(0.98)" },
+        { opacity: 1, transform: "translate(-50%, -2px) scale(1)" },
+        { opacity: 0, transform: "translate(-38%, -16px) scale(1.02)" },
+      ];
+    case "riseFast":
+      return [
+        { opacity: 0, transform: "translate(-50%, 8px) scale(0.94)" },
+        { opacity: 1, transform: "translate(-50%, -6px) scale(1)" },
+        { opacity: 0, transform: "translate(-50%, -28px) scale(1.02)" },
+      ];
+    case "floatUp":
+    default:
+      return [
+        { opacity: 0, transform: `translate(-50%, ${Math.max(8, distance)}px) scale(0.96)` },
+        { opacity: 1, transform: "translate(-50%, 0) scale(1)" },
+        { opacity: 0, transform: `translate(-50%, ${-Math.max(10, distance)}px) scale(1.02)` },
+      ];
+  }
+};
+
+// 中文注释：通用浮字函数（可复用于技能名/伤害数字/嘲讽语等文本提示）。
+const removeFloatingItem = (id) => {
+  floatingItems.value = floatingItems.value.filter((item) => item.id !== id);
+  const running = floatAnimationMap.get(id);
+  if (running) {
+    running.cancel();
+    floatAnimationMap.delete(id);
+  }
+};
+
+const playFloatingText = (text, config = {}) => {
+  const cfg = {
+    ...DEFAULT_FLOAT_CONFIG,
+    ...(config || {}),
+  };
+  const value = String(text || "");
+  if (!value.trim()) return;
+  const id = `${Date.now()}-${Math.random()}`;
+  floatingItems.value = [
+    ...floatingItems.value,
+    {
+      id,
+      text: value,
+      cfg,
+    },
+  ];
+  // 中文注释：等待节点渲染后再启动每条浮字的独立动画。
+  requestAnimationFrame(() => {
+    const el = cardRef.value?.querySelector(`[data-float-id="${id}"]`);
+    if (!el?.animate) {
+      setTimeout(() => removeFloatingItem(id), Number(cfg.duration || 900));
+      return;
+    }
+    const animation = el.animate(buildFloatKeyframes(cfg), {
+      duration: Number(cfg.duration || 900),
+      easing: String(cfg.easing || DEFAULT_FLOAT_CONFIG.easing),
+    });
+    floatAnimationMap.set(id, animation);
+    animation.onfinish = () => {
+      floatAnimationMap.delete(id);
+      removeFloatingItem(id);
+    };
+  });
+};
+
+const getFloatingItemClass = (item) => buildFloatClass(item.cfg || DEFAULT_FLOAT_CONFIG);
+const getFloatingItemStyle = (item) => buildFloatStyle(item.cfg || DEFAULT_FLOAT_CONFIG);
+
+onBeforeUnmount(() => {
+  if (hitAnimation.value) hitAnimation.value.cancel();
+  if (statusAnimation.value) statusAnimation.value.cancel();
+  for (const animation of floatAnimationMap.values()) {
+    animation.cancel();
+  }
+  floatAnimationMap.clear();
+});
+
+watch(
+  () => props.floatToken,
+  () => {
+    playFloatingText(props.floatText, props.floatConfig);
+  }
+);
 
 watch(
   () => props.hitToken,
@@ -99,11 +234,6 @@ watch(
     playStatusAnimation();
   }
 );
-
-onBeforeUnmount(() => {
-  if (hitAnimation.value) hitAnimation.value.cancel();
-  if (statusAnimation.value) statusAnimation.value.cancel();
-});
 
 const showStrengthModal = ref(false);
 
@@ -145,6 +275,18 @@ const formatCondition = (condition) => {
 
 <template>
   <article ref="cardRef" class="unit-card" :class="[theme, { active }]">
+    <div class="floating-layer">
+      <div
+        v-for="item in floatingItems"
+        :key="item.id"
+        class="floating-text show"
+        :class="getFloatingItemClass(item)"
+        :style="getFloatingItemStyle(item)"
+        :data-float-id="item.id"
+      >
+        {{ item.text }}
+      </div>
+    </div>
     <header>
       <p class="label">{{ title }}</p>
       <h2>{{ unit?.name || "--" }}</h2>
@@ -272,6 +414,66 @@ const formatCondition = (condition) => {
   box-shadow: 0 0 0 1px rgba(110, 205, 255, 0.4),
     0 20px 40px rgba(56, 120, 255, 0.25);
   transform: translateY(-2px);
+}
+
+.floating-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.floating-text {
+  position: absolute;
+  left: 50%;
+  top: 10px;
+  transform: translate(-50%, 0);
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(8, 10, 18, 0.85);
+  color: rgba(250, 253, 255, 0.95);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 1;
+  white-space: nowrap;
+}
+
+.floating-text.show {
+  opacity: 1;
+}
+
+.floating-text.style-skill {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(8, 10, 18, 0.85);
+  color: rgba(250, 253, 255, 0.95);
+}
+
+.floating-text.style-damage {
+  border-color: rgba(255, 123, 102, 0.48);
+  background: rgba(50, 14, 14, 0.84);
+  color: #ffd3cc;
+}
+
+.floating-text.style-taunt {
+  border-color: rgba(255, 202, 102, 0.45);
+  background: rgba(53, 34, 10, 0.84);
+  color: #ffe6b7;
+}
+
+.floating-text.style-heal {
+  border-color: rgba(116, 255, 181, 0.45);
+  background: rgba(8, 44, 26, 0.84);
+  color: #c9ffe1;
+}
+
+.floating-text.style-buff {
+  border-color: rgba(155, 182, 255, 0.45);
+  background: rgba(20, 24, 54, 0.84);
+  color: #dce7ff;
 }
 
 .label {

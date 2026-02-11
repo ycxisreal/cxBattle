@@ -199,7 +199,8 @@ const createBlessingRegistry = () => ({
   }),
   // 提升防御：支持重复获取，按当前层数补齐未生效增量。
   reinforced_armor: ({ state, blessingDef, instance }) => ({
-    onInstall() {
+    // 中文注释：统一补齐层数增量，供安装/回合开始/层数变化复用。
+    applyStackDelta() {
       if (!state?.player) return;
       const stack = getBlessingStack(state, blessingDef.id);
       const appliedStack = Number(instance.state.appliedStack || 0);
@@ -208,14 +209,14 @@ const createBlessingRegistry = () => ({
       state.player.defence = Number(state.player.defence || 0) + 10 * deltaStack;
       instance.state.appliedStack = stack;
     },
+    onInstall() {
+      this.applyStackDelta();
+    },
     onRoundStart() {
-      if (!state?.player) return;
-      const stack = getBlessingStack(state, blessingDef.id);
-      const appliedStack = Number(instance.state.appliedStack || 0);
-      if (stack <= appliedStack) return;
-      const deltaStack = stack - appliedStack;
-      state.player.defence = Number(state.player.defence || 0) + 10 * deltaStack;
-      instance.state.appliedStack = stack;
+      this.applyStackDelta();
+    },
+    onStackChange() {
+      this.applyStackDelta();
     },
   }),
   // 安装时立刻获得10回合15%强化状态。
@@ -275,7 +276,8 @@ const createBlessingRegistry = () => ({
   }),
   // 按层数提升暴击率（每层+5%）。
   bloodletting: ({ state, blessingDef, instance }) => ({
-    onInstall() {
+    // 中文注释：层数增加后立即补上暴击率增益，确保 UI 实时更新。
+    applyStackDelta() {
       if (!state?.player) return;
       const stack = getBlessingStack(state, blessingDef.id);
       const appliedStack = Number(instance.state.appliedStack || 0);
@@ -287,17 +289,14 @@ const createBlessingRegistry = () => ({
       );
       instance.state.appliedStack = stack;
     },
+    onInstall() {
+      this.applyStackDelta();
+    },
     onRoundStart() {
-      if (!state?.player) return;
-      const stack = getBlessingStack(state, blessingDef.id);
-      const appliedStack = Number(instance.state.appliedStack || 0);
-      if (stack <= appliedStack) return;
-      const deltaStack = stack - appliedStack;
-      state.player.criticalRate = Math.min(
-        1,
-        Number(state.player.criticalRate || 0) + 0.05 * deltaStack
-      );
-      instance.state.appliedStack = stack;
+      this.applyStackDelta();
+    },
+    onStackChange() {
+      this.applyStackDelta();
     },
   }),
   // 对低血量目标造成伤害前增伤（主动技能生效）。
@@ -325,7 +324,8 @@ const createBlessingRegistry = () => ({
   }),
   // 按层提升暴击伤害倍率（每层+0.2）。
   crit_damage_increase: ({ state, blessingDef, instance }) => ({
-    onInstall() {
+    // 中文注释：暴击倍率层数增益统一在这里补齐，避免只在下回合才生效。
+    applyStackDelta() {
       if (!state?.player) return;
       const stack = getBlessingStack(state, blessingDef.id);
       const appliedStack = Number(instance.state.appliedStack || 0);
@@ -334,14 +334,14 @@ const createBlessingRegistry = () => ({
       state.player.criticalHurtRate = Number(state.player.criticalHurtRate || 1) + 0.2 * deltaStack;
       instance.state.appliedStack = stack;
     },
+    onInstall() {
+      this.applyStackDelta();
+    },
     onRoundStart() {
-      if (!state?.player) return;
-      const stack = getBlessingStack(state, blessingDef.id);
-      const appliedStack = Number(instance.state.appliedStack || 0);
-      if (stack <= appliedStack) return;
-      const deltaStack = stack - appliedStack;
-      state.player.criticalHurtRate = Number(state.player.criticalHurtRate || 1) + 0.2 * deltaStack;
-      instance.state.appliedStack = stack;
+      this.applyStackDelta();
+    },
+    onStackChange() {
+      this.applyStackDelta();
     },
   }),
   // 伤害前比较双方生命比例并调整伤害。
@@ -379,7 +379,8 @@ const createBlessingRegistry = () => ({
   }),
   // 按层数提升护甲并降低每回合回复。
   venom_cake: ({ state, blessingDef, instance }) => ({
-    onInstall() {
+    // 中文注释：同步叠层带来的护甲与回复变化，避免属性显示延迟。
+    applyStackDelta() {
       if (!state?.player) return;
       const stack = getBlessingStack(state, blessingDef.id);
       const appliedStack = Number(instance.state.appliedStack || 0);
@@ -389,20 +390,20 @@ const createBlessingRegistry = () => ({
       state.player.healPerRound = Number(state.player.healPerRound || 0) - 3 * deltaStack;
       instance.state.appliedStack = stack;
     },
+    onInstall() {
+      this.applyStackDelta();
+    },
     onRoundStart() {
-      if (!state?.player) return;
-      const stack = getBlessingStack(state, blessingDef.id);
-      const appliedStack = Number(instance.state.appliedStack || 0);
-      if (stack <= appliedStack) return;
-      const deltaStack = stack - appliedStack;
-      state.player.defence = Number(state.player.defence || 0) + 6 * deltaStack;
-      state.player.healPerRound = Number(state.player.healPerRound || 0) - 3 * deltaStack;
-      instance.state.appliedStack = stack;
+      this.applyStackDelta();
+    },
+    onStackChange() {
+      this.applyStackDelta();
     },
   }),
   // 获得时立刻叠加10回合护甲状态，可随层数追加。
   heavy_armor: ({ state, blessingDef, instance }) => ({
-    onInstall() {
+    // 中文注释：每次叠层都立即刷新护甲状态值，持续回合重置为10。
+    applyStackDelta() {
       if (!state?.player) return;
       const stack = getBlessingStack(state, blessingDef.id);
       const appliedStack = Number(instance.state.appliedStack || 0);
@@ -415,18 +416,14 @@ const createBlessingRegistry = () => ({
       };
       instance.state.appliedStack = stack;
     },
+    onInstall() {
+      this.applyStackDelta();
+    },
     onRoundStart() {
-      if (!state?.player) return;
-      const stack = getBlessingStack(state, blessingDef.id);
-      const appliedStack = Number(instance.state.appliedStack || 0);
-      if (stack <= appliedStack) return;
-      const deltaStack = stack - appliedStack;
-      const current = state.player.armorStatus || { round: 0, value: 0 };
-      state.player.armorStatus = {
-        round: 10,
-        value: Number(current.value || 0) + 10 * deltaStack,
-      };
-      instance.state.appliedStack = stack;
+      this.applyStackDelta();
+    },
+    onStackChange() {
+      this.applyStackDelta();
     },
   }),
   // 安装时提升生命值与生命上限20%，并使自己停止行动3回合。
@@ -444,7 +441,8 @@ const createBlessingRegistry = () => ({
   }),
   // 按层数提升速度（每层+1.5，最高10）。
   ice_skates: ({ state, blessingDef, instance }) => ({
-    onInstall() {
+    // 中文注释：速度由基础速度+层数计算，叠层时即时重算并限制上限10。
+    applyStackDelta() {
       if (!state?.player) return;
       if (!Number.isFinite(instance.state.baseSpeed)) {
         instance.state.baseSpeed = Number(state.player.speed || 0);
@@ -452,13 +450,14 @@ const createBlessingRegistry = () => ({
       const stack = getBlessingStack(state, blessingDef.id);
       state.player.speed = Math.min(10, Number(instance.state.baseSpeed || 0) + 1.5 * stack);
     },
+    onInstall() {
+      this.applyStackDelta();
+    },
     onRoundStart() {
-      if (!state?.player) return;
-      if (!Number.isFinite(instance.state.baseSpeed)) {
-        instance.state.baseSpeed = Number(state.player.speed || 0);
-      }
-      const stack = getBlessingStack(state, blessingDef.id);
-      state.player.speed = Math.min(10, Number(instance.state.baseSpeed || 0) + 1.5 * stack);
+      this.applyStackDelta();
+    },
+    onStackChange() {
+      this.applyStackDelta();
     },
   }),
   // 伤害后有概率均衡双方攻击力：高者向低者分出2点。
@@ -547,8 +546,26 @@ export const installBlessing = ({ blessingDef, hookBus, state }) => {
     handlers.onInstall();
   }
   for (const [eventName, handler] of Object.entries(handlers)) {
-    if (eventName === "onInstall") continue;
-    hookBus.on(eventName, (ctx) => handler(ctx));
+    if (eventName === "onInstall" || eventName === "onStackChange") continue;
+    hookBus.on(eventName, (ctx) => handler.call(handlers, ctx));
   }
   return instance;
+};
+
+// 祝福层数变化后立即刷新对应实现（用于实时更新卡片属性展示）。
+export const refreshBlessingOnStackChange = ({ blessing, state }) => {
+  const registry = createBlessingRegistry();
+  const factory = registry[blessing?.implKey];
+  if (!factory) return;
+  const handlers = factory({
+    state,
+    blessingDef: blessing,
+    instance: blessing,
+  });
+  if (typeof handlers.onStackChange === "function") {
+    handlers.onStackChange({
+      actor: state?.player,
+      target: state?.enemy,
+    });
+  }
 };
