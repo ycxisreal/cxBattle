@@ -44,15 +44,16 @@ const sidebarTabs = [
 const activeSidebarId = ref("skill-formula");
 const showFormulaModal = ref(false);
 const showDifficultyModal = ref(false);
+const showBlessingsModal = ref(false);
 const difficultyDescriptions = {
   normal: "普通：敌人使用默认数值，不额外强化。",
   hard: "困难：生命、攻击提升至 1.2 倍，防御提升至 1.05 倍。",
   extreme:
-    "极难：生命和攻击 1.5 倍，防御 1.05 倍，每回合额外回复 3 点生命，闪避率和暴击率各 +5%。",
+    "极难：生命和攻击 1.4 倍，防御 1.05 倍，每回合额外回复 3 点生命，闪避率 +2%，暴击率 +5%。",
   expert:
-    "专家：生命和攻击 1.7 倍，防御 1.15 倍，每回合额外回复 7 点生命，闪避率和暴击率各 +8%，并随机增加 1 个未拥有被动特长。",
+    "专家：生命和攻击 1.5 倍，防御 1.15 倍，每回合额外回复 7 点生命，闪避率 +4%，暴击率 +8%，并随机增加 1 个未拥有被动特长。",
   inferno:
-    "炼狱：生命和攻击 2.0 倍，防御 1.15 倍，每回合额外回复 12 点生命，闪避率和暴击率各 +10%，并随机增加 1 个未拥有被动特长。",
+    "炼狱：生命和攻击 1.75 倍，防御 1.15 倍，每回合额外回复 12 点生命，闪避率 +6%，暴击率 +10%，并随机增加 1 个未拥有被动特长。",
 };
 
 // 当前难度文本与样式标记。
@@ -210,6 +211,16 @@ const closeDifficultyModal = () => {
   showDifficultyModal.value = false;
 };
 
+// 中文注释：打开右侧构筑的“全部祝福预览”弹窗。
+const openBlessingsModal = () => {
+  showBlessingsModal.value = true;
+};
+
+// 中文注释：关闭“全部祝福预览”弹窗。
+const closeBlessingsModal = () => {
+  showBlessingsModal.value = false;
+};
+
 const isPreDraftSelected = (draftId) => state.draft.selectedPreIds.includes(draftId);
 const toggleDraftCandidate = (draftId) => {
   const result = togglePreDraftItem(draftId);
@@ -287,6 +298,17 @@ const midDraftQualityWeightText = computed(() => {
   const weights = state.draft.midDraftQualityWeights || {};
   const format = (value) => Number(value || 0).toFixed(1);
   return `A ${format(weights.A)} / B ${format(weights.B)} / C ${format(weights.C)}`;
+});
+
+// 中文注释：用于右侧构筑面板的品质权重高亮展示（A/B/C 数值分离显示）。
+const midDraftQualityWeightsDisplay = computed(() => {
+  const weights = state.draft.midDraftQualityWeights || {};
+  const format = (value) => Number(value || 0).toFixed(1);
+  return [
+    { key: "A", value: format(weights.A) },
+    { key: "B", value: format(weights.B) },
+    { key: "C", value: format(weights.C) },
+  ];
 });
 </script>
 
@@ -595,25 +617,46 @@ const midDraftQualityWeightText = computed(() => {
       <aside class="battle-side battle-side-right" aria-hidden="true">
         <div class="side-placeholder">
           <p class="side-title">祝福三选一触发条件</p>
-          <p class="side-sub">当前品质权重：{{ midDraftQualityWeightText }}</p>
+          <p class="side-sub">当前品质权重</p>
+          <div class="quality-weight-focus">
+            <div
+              v-for="item in midDraftQualityWeightsDisplay"
+              :key="`weight-${item.key}`"
+              class="quality-weight-chip"
+            >
+              <span class="quality-weight-key">{{ item.key }}</span>
+              <span class="quality-weight-value">{{ item.value }}</span>
+            </div>
+          </div>
           <ul class="build-list build-list-conditions">
             <li v-for="item in midDraftTriggerConditions" :key="item">{{ item }}</li>
           </ul>
           <p class="side-title">当前构筑</p>
-          <p class="side-sub">祝福（{{ state.blessings.length }}）</p>
-          <ul class="build-list">
+          <p class="side-sub build-section-sub">祝福（{{ state.blessings.length }}）</p>
+          <button
+            v-if="state.blessings.length"
+            class="ghost build-more-btn"
+            type="button"
+            @click="openBlessingsModal"
+          >
+            查看全部祝福
+          </button>
+          <ul class="build-list build-list-build blessing-scroll-list">
             <li v-for="item in state.blessings" :key="`blessing-${item.id}`">
               <p class="build-name">
-                {{ item.name }} <small>层数 {{ getBuildBlessingStackText(item) }}</small>
+                <span class="build-name-text">{{ item.name }}</span>
+                <small class="build-stack-badge">层数 {{ getBuildBlessingStackText(item) }}</small>
               </p>
               <p class="build-effect">{{ item.desc || "无效果描述" }}</p>
             </li>
             <li v-if="!state.blessings.length">暂无</li>
           </ul>
-          <p class="side-sub">装备（{{ state.equipments.length }}/2）</p>
-          <ul class="build-list">
+          <p class="side-sub build-section-sub">装备（{{ state.equipments.length }}/2）</p>
+          <ul class="build-list build-list-build">
             <li v-for="item in state.equipments" :key="item.id">
-              <p class="build-name">{{ item.name }}</p>
+              <p class="build-name">
+                <span class="build-name-text">{{ item.name }}</span>
+              </p>
               <p class="build-effect">{{ getEquipmentEffectText(item) }}</p>
             </li>
             <li v-if="!state.equipments.length">暂无</li>
@@ -667,10 +710,10 @@ const midDraftQualityWeightText = computed(() => {
       </div>
     </div>
 
-    <div
-      v-if="state.draft.midPending"
-      class="modal-backdrop"
-    >
+      <div
+        v-if="state.draft.midPending"
+        class="modal-backdrop"
+      >
       <div class="modal draft-modal">
         <div class="modal-header">
           <h4>祝福三选一</h4>
@@ -695,6 +738,34 @@ const midDraftQualityWeightText = computed(() => {
               </p>
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      v-if="showBlessingsModal"
+      class="modal-backdrop"
+      @click.self="closeBlessingsModal"
+    >
+      <div class="modal blessing-modal">
+        <div class="modal-header">
+          <h4>全部祝福预览</h4>
+          <button class="ghost" type="button" @click="closeBlessingsModal">
+            关闭
+          </button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-hint">当前已拥有 {{ state.blessings.length }} 个祝福。</p>
+          <ul class="build-list build-list-build blessing-modal-list">
+            <li v-for="item in state.blessings" :key="`blessing-modal-${item.id}`">
+              <p class="build-name">
+                <span class="build-name-text">{{ item.name }}</span>
+                <small class="build-stack-badge">层数 {{ getBuildBlessingStackText(item) }}</small>
+              </p>
+              <p class="build-effect">{{ item.desc || "无效果描述" }}</p>
+            </li>
+            <li v-if="!state.blessings.length">暂无祝福</li>
+          </ul>
         </div>
       </div>
     </div>
@@ -967,6 +1038,38 @@ h1 {
   color: rgba(255, 255, 255, 0.75) !important;
 }
 
+.quality-weight-focus {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.quality-weight-chip {
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+.quality-weight-key {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.66);
+}
+
+.quality-weight-value {
+  font-size: 18px;
+  line-height: 1;
+  font-weight: 800;
+  color: #f5f7ff;
+}
+
 .build-list {
   margin: 6px 0 0;
   padding-left: 16px;
@@ -982,14 +1085,71 @@ h1 {
 
 .build-name {
   margin: 0;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.9);
+  font-size: 15px;
+  line-height: 1.35;
+  font-weight: 800;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .build-effect {
   margin: 2px 0 0;
   font-size: 11px;
   color: rgba(255, 255, 255, 0.64);
+}
+
+.build-list-build {
+  margin-top: 8px;
+  padding-left: 0;
+  list-style: none;
+  gap: 8px;
+}
+
+.build-list-build li {
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 8px 10px;
+}
+
+.blessing-scroll-list {
+  max-height: 480px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.build-section-sub {
+  margin-top: 12px !important;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.88) !important;
+}
+
+.build-more-btn {
+  margin-top: 6px;
+  align-self: flex-start;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  border-color: rgba(74, 215, 191, 0.45);
+  background: rgba(74, 215, 191, 0.12);
+}
+
+.build-name-text {
+  color: #f7fbff;
+}
+
+.build-stack-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(74, 215, 191, 0.45);
+  background: rgba(74, 215, 191, 0.12);
+  color: #bdf5e9;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .sidebar-tabs {
@@ -1111,6 +1271,16 @@ h1 {
 
 .unit-modal {
   width: min(960px, 96vw);
+}
+
+.blessing-modal {
+  width: min(860px, 96vw);
+}
+
+.blessing-modal-list {
+  max-height: min(64vh, 560px);
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .modal-hint {
