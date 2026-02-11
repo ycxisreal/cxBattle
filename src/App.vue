@@ -45,6 +45,7 @@ const activeSidebarId = ref("skill-formula");
 const showFormulaModal = ref(false);
 const showDifficultyModal = ref(false);
 const showBlessingsModal = ref(false);
+const difficultyChangedPendingReset = ref(false);
 const difficultyDescriptions = {
   normal: "普通：敌人使用默认数值，不额外强化。",
   hard: "困难：生命、攻击提升至 1.2 倍，防御提升至 1.05 倍。",
@@ -209,6 +210,11 @@ const closeFormulaModal = () => {
 
 const closeDifficultyModal = () => {
   showDifficultyModal.value = false;
+  if (difficultyChangedPendingReset.value && state.phase === "battle") {
+    resetBattle();
+    ElMessage.success("难度已应用，已重新开始战前构筑。");
+  }
+  difficultyChangedPendingReset.value = false;
 };
 
 // 中文注释：打开右侧构筑的“全部祝福预览”弹窗。
@@ -219,6 +225,13 @@ const openBlessingsModal = () => {
 // 中文注释：关闭“全部祝福预览”弹窗。
 const closeBlessingsModal = () => {
   showBlessingsModal.value = false;
+};
+
+// 中文注释：选择难度时先记录变更，等关闭难度窗口后再统一重开战前构筑。
+const handleDifficultyChange = (difficultyKey) => {
+  if (state.difficulty === difficultyKey) return;
+  setDifficulty(difficultyKey);
+  difficultyChangedPendingReset.value = true;
 };
 
 const isPreDraftSelected = (draftId) => state.draft.selectedPreIds.includes(draftId);
@@ -826,7 +839,7 @@ const midDraftQualityWeightsDisplay = computed(() => {
                   name="enemy-difficulty"
                   :value="option.key"
                   :checked="state.difficulty === option.key"
-                  @change="setDifficulty(option.key)"
+                  @change="handleDifficultyChange(option.key)"
                 />
                 <span>{{ option.label }}</span>
               </label>
