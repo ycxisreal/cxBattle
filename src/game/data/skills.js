@@ -1,8 +1,8 @@
-﻿export const skills = [
+export const skills = [
   {
     "id": 1,
     "name": "火球术【法师】",
-    "des": "向敌人发射一枚毁灭性的火球，造成大量伤害，并灼烧对方体魄，减少对手血量上限。",
+    "des": "向敌人发射一枚毁灭性的火球，造成大量伤害，并灼烧对方体魄，减少对手5点血量上限。",
     "power": 45,
     "suckBloodRate": 0,
     "putStatus": [],
@@ -13,7 +13,7 @@
         "value": 5
       }
     ],
-    "accuracy": 0.66,
+    "accuracy": 0.7,
     "criticalRate": 0.15
   },
   {
@@ -27,23 +27,23 @@
       {
         "self": true,
         "name": "hp",
-        "value": 35
+        "value": 30
       }
     ],
-    "accuracy": 0.66,
+    "accuracy": 0.6,
     "criticalRate": 0
   },
   {
     "id": 3,
     "name": "钢铁之盾【战士】",
-    "des": "进入防御姿态，提高护甲并减少受到的伤害。",
+    "des": "进入防御姿态，提高2点护甲。并提供8护甲状态4回合",
     "power": 0,
     "suckBloodRate": 0,
     "putStatus": [
       {
         "name": "armor",
-        "round": 5,
-        "value": 10
+        "round": 4,
+        "value": 8
       }
     ],
     "changeValue": [
@@ -99,7 +99,7 @@
   {
     "id": 6,
     "name": "暗影步【盗贼】",
-    "des": "以不可预测的方式移动，使敌人更难命中。增加5%闪避",
+    "des": "以不可预测的方式移动，使敌人更难命中。增加2%闪避",
     "power": 0,
     "suckBloodRate": 0,
     "putStatus": [],
@@ -107,7 +107,7 @@
       {
         "self": true,
         "name": "missRate",
-        "rate": 0.05
+        "rate": 0.02
       }
     ],
     "accuracy": 0.9,
@@ -150,8 +150,8 @@
   {
     "id": 9,
     "name": "破甲攻击【战士】",
-    "des": "造成一定程度的伤害，并破除对方一定量护甲",
-    "power": 30,
+    "des": "造成一定程度的伤害，并破除对方3点护甲",
+    "power": 25,
     "suckBloodRate": 0,
     "putStatus": [],
     "changeValue": [
@@ -207,22 +207,22 @@
   {
     "id": 12,
     "name": "鲁莽冲锋【战士】【狂战士】",
-    "des": "向敌人发起狂暴冲锋，以牺牲防御换取巨额攻击提升。增加10攻击，减少5防御",
+    "des": "向敌人发起狂暴冲锋，以牺牲防御换取巨额攻击提升。增加10攻击，减少5防御，持续3回合",
     "power": 25,
     "suckBloodRate": 0,
-    "putStatus": [],
-    "changeValue": [
+    "putStatus": [
       {
-        "self": true,
-        "name": "attack",
+        "name": "damage",
+        "round": 3,
         "value": 10
       },
       {
-        "self": true,
-        "name": "defence",
+        "name": "armor",
+        "round": 3,
         "value": -5
       }
     ],
+    "changeValue": [],
     "accuracy": 0.8,
     "criticalRate": 0.2
   },
@@ -241,7 +241,7 @@
     ],
     "changeValue": [],
     "accuracy": 0.9,
-    "criticalRate": 0.05
+    "criticalRate": 0.07
   },
   {
     "id": 14,
@@ -297,14 +297,14 @@
   {
     "id": 17,
     "name": "以太护盾【圣骑士】",
-    "des": "召唤魔法屏障，使防御力提升5%3回合，并提升2点防御。",
+    "des": "召唤魔法屏障，使防御力提升5持续3回合，并永久提升2点防御。",
     "power": 0,
     "suckBloodRate": 0,
     "putStatus": [
       {
         "name": "armor",
         "round": 3,
-        "rate": 1.05
+        "value": 5
       }
     ],
     "changeValue": [
@@ -320,7 +320,7 @@
   {
     "id": 18,
     "name": "致盲闪光【法师】【小丑】",
-    "des": "释放强烈闪光，使敌人攻击力降低20%。",
+    "des": "释放强烈闪光，造成伤害，使敌人攻击力降低20%持续2回合。",
     "power": 20,
     "suckBloodRate": 0,
     "putStatus": [
@@ -353,7 +353,7 @@
         "value": 1
       }
     ],
-    "accuracy": 0.7,
+    "accuracy": 0.66,
     "criticalRate": 0
   },
   {
@@ -393,19 +393,19 @@
   {
     "id": 22,
     "name": "防御姿态【战士】【圣骑士】",
-    "des": "采取防御姿势，减少20%攻击力并提高30%防御3回合。",
+    "des": "采取防御姿势，减少6攻击力并提高9防御3回合。",
     "power": 0,
     "suckBloodRate": 0,
     "putStatus": [
       {
         "name": "damage",
         "round": 3,
-        "rate": 0.8
+        "value": -6
       },
       {
         "name": "armor",
         "round": 3,
-        "rate": 1.3
+        "value": 9
       }
     ],
     "changeValue": [],
@@ -415,7 +415,7 @@
   {
     "id": 23,
     "name": "生命强化【圣骑士】",
-    "des": "强化生命力10点，提高最大生命值10点。",
+    "des": "强化生命力6点，提高最大生命值6点。",
     "power": 0,
     "suckBloodRate": 0,
     "putStatus": [],
@@ -423,12 +423,12 @@
       {
         "self": true,
         "name": "hpCount",
-        "value": 10
+        "value": 6
       },
       {
         "self": true,
         "name": "hp",
-        "value": 10
+        "value": 6
       }
     ],
     "accuracy": 1,
@@ -528,7 +528,7 @@
   {
     "id": 29,
     "name": "潜入暗影【盗贼】",
-    "des": "遁入阴影之中，提高2速度但降低4防御。",
+    "des": "遁入阴影之中，提高0.5速度但降低1防御。",
     "power": 15,
     "suckBloodRate": 0,
     "putStatus": [],
@@ -536,12 +536,12 @@
       {
         "self": true,
         "name": "speed",
-        "value": 2
+        "value": 0.5
       },
       {
         "self": true,
         "name": "defence",
-        "value": -4
+        "value": -1
       }
     ],
     "accuracy": 1,
@@ -649,4 +649,3 @@
   }
 ];
 
-export const skillIndex = new Map(skills.map((skill) => [skill.id, skill]));

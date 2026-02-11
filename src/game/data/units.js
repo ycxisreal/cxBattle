@@ -1,4 +1,4 @@
-﻿export const units = [
+export const units = [
   {
     "id": 1,
     "name": "战士",
@@ -85,8 +85,8 @@
     "hp": 260,
     "defence": 15,
     "defenceDefault": 15,
-    "attack": 40,
-    "attackDefault": 40,
+    "attack": 37,
+    "attackDefault": 37,
     "strength": [
       18
     ],
@@ -103,7 +103,7 @@
       35,
       36
     ],
-    "missRate": 0.2,
+    "missRate": 0.12,
     "criticalRate": 0.3,
     "criticalHurtRate": 1.8,
     "healPerRound": 0,
@@ -206,9 +206,7 @@
       7,
       8,
       9,
-      11,
       21,
-      18,
       16
     ],
     "skillList": [
@@ -273,3 +271,4 @@
     "des": "攻防均衡的武僧，拥有稳定属性和持续自我恢复能力。"
   }
 ];
+
