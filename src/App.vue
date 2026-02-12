@@ -1,5 +1,5 @@
 ﻿<script setup>
-import { computed, ref, watchEffect } from "vue";
+import { computed, reactive, ref, watchEffect } from "vue";
 import { ElMessage } from "element-plus";
 import { Refresh } from "@element-plus/icons-vue";
 import BattleLog from "./components/BattleLog.vue";
@@ -25,6 +25,13 @@ const {
   refreshPreDraftCandidates,
   confirmPreDraft,
   chooseMidDraftBlessing,
+  clearGameOverMeta,
+  globalPointSummary,
+  getUnitPointRows,
+  getAllUnitPointOverview,
+  allocatePointToUnit,
+  deallocatePointFromUnit,
+  resetUnitPointAllocation,
 } = useBattle();
 
 const selectedUnitId = ref(null);
@@ -45,7 +52,17 @@ const activeSidebarId = ref("skill-formula");
 const showFormulaModal = ref(false);
 const showDifficultyModal = ref(false);
 const showBlessingsModal = ref(false);
+const showPointModal = ref(false);
+const activePointUnitId = ref(null);
+const showGameOverModal = ref(false);
+const lastAutoGameOverKey = ref("");
 const difficultyChangedPendingReset = ref(false);
+const gameOverDialog = reactive({
+  reasonText: "",
+  pointGain: 0,
+  confirmText: "确认",
+  afterConfirm: null,
+});
 const difficultyDescriptions = {
   normal: "普通：敌人使用默认数值，不额外强化。",
   hard: "困难：生命、攻击提升至 1.2 倍，防御提升至 1.05 倍。",
@@ -65,6 +82,13 @@ const currentDifficultyTone = computed(() => `tone-${state.difficulty}`);
 
 const selectedUnit = computed(() =>
   availableUnits.value.find((unit) => unit.id === selectedUnitId.value)
+);
+const activePointUnit = computed(() =>
+  availableUnits.value.find((unit) => unit.id === activePointUnitId.value)
+);
+const pointOverviewList = computed(() => getAllUnitPointOverview());
+const activePointRows = computed(() =>
+  activePointUnitId.value ? getUnitPointRows(activePointUnitId.value) : []
 );
 
 // 计算角色分页总数
@@ -95,6 +119,40 @@ const activeSidebarTab = computed(
 watchEffect(() => {
   const maxPageIndex = totalUnitPages.value - 1;
   if (unitPage.value > maxPageIndex) unitPage.value = maxPageIndex;
+  const availableIds = availableUnits.value.map((unit) => unit.id);
+  if (!availableIds.length) {
+    activePointUnitId.value = null;
+    return;
+  }
+  if (!availableIds.includes(activePointUnitId.value)) {
+    activePointUnitId.value = selectedUnitId.value && availableIds.includes(selectedUnitId.value)
+      ? selectedUnitId.value
+      : availableIds[0];
+  }
+});
+
+watchEffect(() => {
+  if (state.phase !== "battle") return;
+  if (!state.over || !state.gameOverReason) return;
+  const key = `${state.round}-${state.gameOverReason}-${state.winner || ""}`;
+  if (key === lastAutoGameOverKey.value) return;
+  lastAutoGameOverKey.value = key;
+  const reasonText =
+    state.gameOverReason === "enemy_defeated_non_chain"
+      ? "你击败了敌人（非连战模式下本局结束）"
+      : "你被敌人击败";
+  openGameOverDialog({
+    reasonText,
+    pointGain: Number(state.gameOverPointGain || 0),
+    confirmText: "确认",
+    afterConfirm: null,
+  });
+});
+
+watchEffect(() => {
+  if (!state.over) {
+    lastAutoGameOverKey.value = "";
+  }
 });
 
 // 选择角色并在需要时关闭弹窗
@@ -155,6 +213,49 @@ const handleBackToSelect = () => {
   selectedUnitId.value = state.selectedPlayerId;
   autoSkillIds.value = [];
   selectedSkillIds.value = [];
+};
+
+// 中文注释：统一打开“游戏结束”弹窗，并在确认后执行可选后续动作。
+const openGameOverDialog = ({
+  reasonText,
+  pointGain = 0,
+  confirmText = "确认",
+  afterConfirm = null,
+}) => {
+  gameOverDialog.reasonText = reasonText;
+  gameOverDialog.pointGain = Number(pointGain || 0);
+  gameOverDialog.confirmText = confirmText;
+  gameOverDialog.afterConfirm = typeof afterConfirm === "function" ? afterConfirm : null;
+  showGameOverModal.value = true;
+};
+
+// 中文注释：确认结束弹窗后，先关闭弹窗，再继续执行后续动作（如退出或重开）。
+const confirmGameOverDialog = () => {
+  const nextAction = gameOverDialog.afterConfirm;
+  showGameOverModal.value = false;
+  gameOverDialog.afterConfirm = null;
+  clearGameOverMeta();
+  if (nextAction) nextAction();
+};
+
+// 中文注释：手动结束并退出，按“玩家被击败”处理。
+const handleEndGameAndExit = () => {
+  openGameOverDialog({
+    reasonText: "你选择结束本局并退出（按玩家被击败结算）",
+    pointGain: Number(state.runPointGain || 0),
+    confirmText: "确认并退出",
+    afterConfirm: handleBackToSelect,
+  });
+};
+
+// 中文注释：手动结束并重新开始，按“玩家被击败”处理。
+const handleEndGameAndRestart = () => {
+  openGameOverDialog({
+    reasonText: "你选择结束本局并重新开始（按玩家被击败结算）",
+    pointGain: Number(state.runPointGain || 0),
+    confirmText: "确认并重开",
+    afterConfirm: handleResetBattle,
+  });
 };
 
 // 从技能池中随机抽取指定数量的技能ID（不重复）。
@@ -227,6 +328,56 @@ const closeBlessingsModal = () => {
   showBlessingsModal.value = false;
 };
 
+// 中文注释：打开全局加点弹窗，默认聚焦到当前已选择角色。
+const openPointModal = () => {
+  if (selectedUnitId.value) {
+    activePointUnitId.value = selectedUnitId.value;
+  }
+  showPointModal.value = true;
+};
+
+// 中文注释：关闭全局加点弹窗。
+const closePointModal = () => {
+  showPointModal.value = false;
+};
+
+// 中文注释：切换加点弹窗中的目标角色。
+const switchPointUnit = (unitId) => {
+  activePointUnitId.value = unitId;
+};
+
+// 中文注释：对选中角色执行单次属性加点，并给出提示。
+const handleAllocatePoint = (unitId, attrKey) => {
+  const result = allocatePointToUnit(unitId, attrKey);
+  if (result?.ok) {
+    ElMessage.success("加点成功");
+    return;
+  }
+  if (result?.message) {
+    ElMessage.warning(result.message);
+  }
+};
+
+// 中文注释：对选中角色执行单次属性减点，并给出提示。
+const handleDeallocatePoint = (unitId, attrKey) => {
+  const result = deallocatePointFromUnit(unitId, attrKey);
+  if (result?.ok) {
+    ElMessage.success("减点成功");
+    return;
+  }
+  if (result?.message) {
+    ElMessage.warning(result.message);
+  }
+};
+
+// 中文注释：重置单个角色的加点分配。
+const handleResetPointUnit = (unitId) => {
+  const result = resetUnitPointAllocation(unitId);
+  if (result?.ok) {
+    ElMessage.success(`已重置，返还 ${result.resetPoints} 点`);
+  }
+};
+
 // 中文注释：选择难度时先记录变更，等关闭难度窗口后再统一重开战前构筑。
 const handleDifficultyChange = (difficultyKey) => {
   if (state.difficulty === difficultyKey) return;
@@ -243,7 +394,7 @@ const toggleDraftCandidate = (draftId) => {
 };
 const handleConfirmPreDraft = () => confirmPreDraft();
 const handleRefreshPreDraft = () => refreshPreDraftCandidates();
-const handlePickMidDraftBlessing = (blessingId) => chooseMidDraftBlessing(blessingId);
+const handlePickMidDraftBlessing = (optionId) => chooseMidDraftBlessing(optionId);
 const getQualityClass = (quality) => `quality-${String(quality || "C").toLowerCase()}`;
 const getDraftEffectText = (item) =>
   item.type === "blessing"
@@ -274,6 +425,12 @@ const getBuildBlessingStackText = (blessing) => {
   const max = getBlessingMaxStack(blessing);
   return `${now}/${max}`;
 };
+const formatPointValue = (value, displayAsPercent) => {
+  const num = Number(value || 0);
+  if (displayAsPercent) return `${(num * 100).toFixed(1)}%`;
+  if (Number.isInteger(num)) return String(num);
+  return num.toFixed(1);
+};
 
 const preDraftSelectedCost = computed(() =>
   state.draft.preCandidates
@@ -290,6 +447,7 @@ const midDraftTriggerConditions = computed(() => {
   const conditions = [
     `每 ${state.draft.midDraftRoundInterval} 回合触发一次`,
     state.chainMode ? "连战中：每击败 1 个敌人触发一次" : "连战中：每击败 1 个敌人触发一次（当前未开启）",
+    "每次三选一均包含固定选项：回复60%最大生命值",
   ];
   const startEnemyIndex = Number(state.draft.halfHpTriggerEnemyStartIndex || 5);
   if (state.enemyIndex >= startEnemyIndex) {
@@ -337,81 +495,95 @@ const midDraftQualityWeightsDisplay = computed(() => {
         </div>
         <div class="hero-actions">
           <button class="primary" type="button" @click="toggleRandomize">
-            {{ state.randomize ? "关闭属性浮动" : "开启属性浮动" }}
+            {{ state.randomize ? "关闭随机倍率影响" : "开启随机倍率影响" }}
           </button>
         </div>
       </header>
 
       <section class="select">
-        <div class="select-panel">
-          <div class="select-head">
-            <h3>选择你的角色</h3>
-            <p>选择一名角色进入战斗，对手将随机生成。</p>
-          </div>
-          <div class="select-controls">
-            <p class="page-indicator">
-              第 {{ currentUnitPage }} / {{ totalUnitPages }} 页，最多展示 {{ maxUnitDisplay }} 名
-            </p>
-            <div class="select-actions">
+          <div class="select-panel">
+            <div class="select-head">
+              <h3>选择你的角色</h3>
+              <p>选择一名角色进入战斗，对手将随机生成。</p>
+            </div>
+            <div class="select-controls">
+              <p class="page-indicator">
+                第 {{ currentUnitPage }} / {{ totalUnitPages }} 页，最多展示 {{ maxUnitDisplay }} 名
+              </p>
+              <div class="select-actions">
+                <button
+                  class="ghost"
+                  type="button"
+                  :disabled="!shouldShowUnitControls"
+                  @click="prevUnitPage"
+                >
+                  上一批
+                </button>
+                <button
+                  class="ghost"
+                  type="button"
+                  :disabled="!shouldShowUnitControls"
+                  @click="nextUnitPage"
+                >
+                  下一批
+                </button>
+                <button class="primary" type="button" @click="openUnitModal">
+                  查看全部
+                </button>
+              </div>
+            </div>
+            <div class="select-grid">
               <button
-                class="ghost"
+                v-for="unit in pagedUnits"
+                :key="unit.id"
+                class="select-card"
+                :class="{ active: selectedUnitId === unit.id }"
                 type="button"
-                :disabled="!shouldShowUnitControls"
-                @click="prevUnitPage"
+                @click="handleSelectUnit(unit.id)"
               >
-                上一批
-              </button>
-              <button
-                class="ghost"
-                type="button"
-                :disabled="!shouldShowUnitControls"
-                @click="nextUnitPage"
-              >
-                下一批
-              </button>
-              <button class="primary" type="button" @click="openUnitModal">
-                查看全部
+                <h4>{{ unit.name }}</h4>
+                <p class="des">{{ unit.des }}</p>
+                <div class="stats">
+                  <span>攻击 {{ unit.attack }}</span>
+                  <span>防御 {{ unit.defence }}</span>
+                  <span>速度 {{ unit.speed }}</span>
+                </div>
               </button>
             </div>
           </div>
-          <div class="select-grid">
+          <aside class="select-preview">
+            <h3>预览</h3>
+            <UnitCard
+              v-if="selectedUnit"
+              title="已选择"
+              :unit="selectedUnit"
+              theme="player"
+              :strengths="strengths"
+            />
+            <p v-else class="hint">请选择一个角色查看详情。</p>
             <button
-              v-for="unit in pagedUnits"
-              :key="unit.id"
-              class="select-card"
-              :class="{ active: selectedUnitId === unit.id }"
+              class="primary start"
               type="button"
-              @click="handleSelectUnit(unit.id)"
+              :disabled="!selectedUnitId"
+              @click="startBattle"
             >
-              <h4>{{ unit.name }}</h4>
-              <p class="des">{{ unit.des }}</p>
-              <div class="stats">
-                <span>攻击 {{ unit.attack }}</span>
-                <span>防御 {{ unit.defence }}</span>
-                <span>速度 {{ unit.speed }}</span>
-              </div>
+              进入战斗
             </button>
-          </div>
-        </div>
-        <aside class="select-preview">
-          <h3>预览</h3>
-          <UnitCard
-            v-if="selectedUnit"
-            title="已选择"
-            :unit="selectedUnit"
-            theme="player"
-            :strengths="strengths"
-          />
-          <p v-else class="hint">请选择一个角色查看详情。</p>
-          <button
-            class="primary start"
-            type="button"
-            :disabled="!selectedUnitId"
-            @click="startBattle"
-          >
-            进入战斗
-          </button>
-        </aside>
+            <div class="point-panel">
+              <p class="point-panel-title">加点模块</p>
+              <p class="point-line">剩余点数：{{ globalPointSummary.remainingPoints }}</p>
+              <p class="point-line">已获得点数：{{ globalPointSummary.totalPoints }} / 300</p>
+              <p class="point-line">已使用点数：{{ globalPointSummary.usedPoints }}</p>
+              <ul class="point-overview-list">
+                <li v-for="item in pointOverviewList" :key="`point-overview-${item.unitId}`">
+                  {{ item.unitName }}：{{ item.usedPoints }} 点
+                </li>
+              </ul>
+              <button class="ghost point-open-btn" type="button" @click="openPointModal">
+                开始加点
+              </button>
+            </div>
+          </aside>
       </section>
 
       <CustomDataPanel />
@@ -430,6 +602,9 @@ const midDraftQualityWeightsDisplay = computed(() => {
               @click="handleSidebarSelect(tab.id)"
             >
               {{ tab.title }}
+            </button>
+            <button class="sidebar-tab random-rate-btn" type="button" @click="toggleRandomize">
+              {{ state.randomize ? "关闭随机倍率影响" : "开启随机倍率影响" }}
             </button>
           </div>
           <div class="difficulty-quick">
@@ -608,20 +783,17 @@ const midDraftQualityWeightsDisplay = computed(() => {
           <p v-if="state.player?.stopRound > 0" class="hint">
             玩家当前被停止行动，回合结束后自动恢复。
           </p>
-          <p v-if="state.over" class="hint">战斗结束，可点击重置再次战斗。</p>
+          <p v-if="state.over" class="hint">战斗结束，确认结算弹窗后可退出或重开。</p>
         </section>
 
         <BattleLog :entries="state.log">
           <template #actions>
-            <button class="ghost reset-enemy-btn" type="button" @click="handleResetBattle">
+            <button class="ghost reset-enemy-btn" type="button" @click="handleEndGameAndRestart">
               <el-icon><Refresh /></el-icon>
-              <span>刷新敌人</span>
+              <span>结束游戏并重新开始</span>
             </button>
-            <button class="ghost" type="button" @click="toggleRandomize">
-              {{ state.randomize ? "关闭属性浮动" : "开启属性浮动" }}
-            </button>
-            <button class="ghost" type="button" @click="handleBackToSelect">
-              返回选人
+            <button class="ghost reset-enemy-btn exit-game-btn" type="button" @click="handleEndGameAndExit">
+              结束游戏并退出
             </button>
           </template>
         </BattleLog>
@@ -732,7 +904,7 @@ const midDraftQualityWeightsDisplay = computed(() => {
           <h4>祝福三选一</h4>
         </div>
         <div class="modal-body">
-          <p>请选择一个祝福立即生效。</p>
+          <p>请选择一个选项立即生效（含固定回血）。</p>
           <p>当前品质权重：{{ midDraftQualityWeightText }}</p>
           <div class="draft-cards">
             <button
@@ -743,11 +915,14 @@ const midDraftQualityWeightsDisplay = computed(() => {
               type="button"
               @click="handlePickMidDraftBlessing(item.id)"
             >
-              <p class="draft-type">祝福</p>
+              <p class="draft-type">{{ item.type === "heal" ? "恢复" : "祝福" }}</p>
               <h4>{{ item.name }}</h4>
               <p class="draft-desc">{{ item.desc }}</p>
-              <p class="draft-meta">
+              <p v-if="item.type === 'blessing'" class="draft-meta">
                 品质 {{ item.quality }} · 价值 {{ item.cost }} · 层数 {{ getBlessingStackText(item) }}
+              </p>
+              <p v-else class="draft-meta">
+                固定选项 · 立即恢复 {{ item.healAmount }} 生命
               </p>
             </button>
           </div>
@@ -779,6 +954,101 @@ const midDraftQualityWeightsDisplay = computed(() => {
             </li>
             <li v-if="!state.blessings.length">暂无祝福</li>
           </ul>
+        </div>
+      </div>
+    </div>
+
+    <div
+      v-if="showPointModal"
+      class="modal-backdrop"
+      @click.self="closePointModal"
+    >
+      <div class="modal point-modal">
+        <div class="modal-header">
+          <h4>全局加点</h4>
+          <button class="ghost" type="button" @click="closePointModal">
+            关闭
+          </button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-hint">
+            剩余点数 {{ globalPointSummary.remainingPoints }} / 已获得点数 {{ globalPointSummary.totalPoints }}
+          </p>
+          <div class="point-unit-tabs">
+            <button
+              v-for="unit in availableUnits"
+              :key="`point-unit-${unit.id}`"
+              type="button"
+              class="point-unit-tab"
+              :class="{ active: activePointUnitId === unit.id }"
+              @click="switchPointUnit(unit.id)"
+            >
+              {{ unit.name }}
+            </button>
+          </div>
+          <div v-if="activePointUnit" class="point-unit-panel">
+            <div class="point-unit-head">
+              <h5>{{ activePointUnit.name }} 加点详情</h5>
+              <button
+                class="ghost point-reset-btn"
+                type="button"
+                @click="handleResetPointUnit(activePointUnit.id)"
+              >
+                重置该角色
+              </button>
+            </div>
+            <div class="point-row-list">
+              <div
+                v-for="row in activePointRows"
+                :key="`point-row-${activePointUnit.id}-${row.attrKey}`"
+                class="point-row"
+              >
+                <p class="point-row-main">
+                  {{ row.label }}：{{ formatPointValue(row.baseValue, row.displayAsPercent) }}+{{
+                    formatPointValue(row.bonusValue, row.displayAsPercent)
+                  }}
+                </p>
+                <p class="point-row-meta">点数：{{ row.pointCount }}/{{ row.maxPoints }}</p>
+                <div class="point-row-actions">
+                  <button
+                    class="ghost point-add-btn"
+                    type="button"
+                    :disabled="row.pointCount <= 0"
+                    @click="handleDeallocatePoint(activePointUnit.id, row.attrKey)"
+                  >
+                    -1
+                  </button>
+                  <button
+                    class="ghost point-add-btn"
+                    type="button"
+                    :disabled="globalPointSummary.remainingPoints <= 0 || row.pointCount >= row.maxPoints"
+                    @click="handleAllocatePoint(activePointUnit.id, row.attrKey)"
+                  >
+                    +1
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      v-if="showGameOverModal"
+      class="modal-backdrop"
+    >
+      <div class="modal game-over-modal">
+        <div class="modal-header">
+          <h4>游戏结束</h4>
+        </div>
+        <div class="modal-body">
+          <p>结束原因：{{ gameOverDialog.reasonText }}</p>
+          <p>本局获取点数：{{ gameOverDialog.pointGain }}</p>
+          <p>当前总点数：{{ globalPointSummary.totalPoints }} / 300</p>
+          <button class="primary" type="button" @click="confirmGameOverDialog">
+            {{ gameOverDialog.confirmText }}
+          </button>
         </div>
       </div>
     </div>
@@ -1241,6 +1511,10 @@ h1 {
   transform: translateY(-1px);
 }
 
+.random-rate-btn {
+  font-weight: 700;
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -1294,6 +1568,95 @@ h1 {
   max-height: min(64vh, 560px);
   overflow-y: auto;
   padding-right: 4px;
+}
+
+.point-modal {
+  width: min(900px, 96vw);
+}
+
+.game-over-modal {
+  width: min(620px, 92vw);
+}
+
+.point-unit-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.point-unit-tab {
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.point-unit-tab.active {
+  border-color: rgba(74, 215, 191, 0.7);
+  background: rgba(74, 215, 191, 0.16);
+}
+
+.point-unit-panel h5 {
+  margin: 4px 0 0;
+  font-size: 16px;
+}
+
+.point-unit-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.point-reset-btn {
+  font-size: 12px;
+  border-radius: 10px;
+}
+
+.point-row-list {
+  margin-top: 6px;
+  display: grid;
+  gap: 8px;
+}
+
+.point-row {
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 8px 10px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    "main action"
+    "meta action";
+  column-gap: 8px;
+  align-items: center;
+}
+
+.point-row-main {
+  grid-area: main;
+  margin: 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.point-row-meta {
+  grid-area: meta;
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.66);
+}
+
+.point-add-btn {
+  min-width: 52px;
+}
+
+.point-row-actions {
+  grid-area: action;
+  display: flex;
+  gap: 6px;
 }
 
 .modal-hint {
@@ -1494,7 +1857,7 @@ h1 {
 
 .select {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
   gap: 18px;
 }
 
@@ -1584,6 +1947,45 @@ h1 {
 
 .select-preview .start {
   align-self: flex-start;
+}
+
+.point-panel {
+  margin-top: 4px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.point-panel-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.point-line {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.point-overview-list {
+  margin: 4px 0 0;
+  padding-left: 16px;
+  max-height: 340px;
+  overflow: auto;
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.point-open-btn {
+  align-self: flex-start;
+  margin-top: 6px;
 }
 
 .center-panel {
@@ -1758,6 +2160,11 @@ h1 {
   background: linear-gradient(180deg, rgba(220, 220, 220, 0.2), rgba(220, 220, 220, 0.08));
 }
 
+.quality-s {
+  background: linear-gradient(180deg, rgba(122, 255, 196, 0.28), rgba(122, 255, 196, 0.1));
+  border-color: rgba(122, 255, 196, 0.55);
+}
+
 .skills header {
   display: flex;
   flex-wrap: wrap;
@@ -1898,6 +2305,12 @@ h1 {
 .reset-enemy-btn:hover {
   opacity: 1;
   transform: translateY(-1px);
+}
+
+.exit-game-btn {
+  color: #fff4f2;
+  background: linear-gradient(135deg, #ff9e8f, #ff4343);
+  box-shadow: 0 10px 24px rgba(232, 64, 64, 0.42);
 }
 
 @media (max-width: 1024px) {

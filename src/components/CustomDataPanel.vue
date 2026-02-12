@@ -8,6 +8,7 @@ import {
   strengths as runtimeStrengths,
   blessings as runtimeBlessings,
   equipmentAffixes as runtimeEquipmentAffixes,
+  progression as runtimeProgression,
   isElectron,
   updateRuntimeData,
 } from "../game/data/runtimeData.js";
@@ -490,6 +491,7 @@ const syncData = async () => {
     strengths: cloneData(customData.strengths),
     blessings: cloneData(customData.blessings),
     equipmentAffixes: cloneData(runtimeEquipmentAffixes),
+    progression: cloneData(runtimeProgression),
   };
   updateRuntimeData(payload);
   if (!isElectronEnv) return;
