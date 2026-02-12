@@ -48,6 +48,10 @@ function loadGameData() {
     strengths: readJsonFile('strengths.json') || [],
     blessings: readJsonFile('blessings.json') || [],
     equipmentAffixes: readJsonFile('equipmentAffixes.json') || [],
+    progression: readJsonFile('progression.json') || {
+      totalPoints: 0,
+      allocations: {},
+    },
   }
 }
 
@@ -84,6 +88,18 @@ ipcMain.handle('demo:save-data', async (event, payload) => {
     fs.writeFileSync(
       path.join(dataDir, 'equipmentAffixes.json'),
       JSON.stringify(payload?.equipmentAffixes ?? [], null, 2),
+      'utf-8'
+    )
+    fs.writeFileSync(
+      path.join(dataDir, 'progression.json'),
+      JSON.stringify(
+        payload?.progression ?? {
+          totalPoints: 0,
+          allocations: {},
+        },
+        null,
+        2
+      ),
       'utf-8'
     )
     return { ok: true }

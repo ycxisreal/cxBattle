@@ -426,13 +426,16 @@ const createBlessingRegistry = () => ({
       this.applyStackDelta();
     },
   }),
-  // 安装时提升生命值与生命上限20%，并使自己停止行动3回合。
+  // 安装时按“当前生命上限”的20%同时提升生命值与生命上限，并使自己停止行动3回合。
   renewal: ({ state, instance }) => ({
+    // 中文注释：生命值增量与生命上限增量保持一致，均基于生效前生命上限计算。
     onInstall() {
       if (!state?.player || instance.state.installed) return;
-      state.player.hpCount = Number(state.player.hpCount || 0) * 1.2;
+      const baseHpCount = Number(state.player.hpCount || 0);
+      const hpDelta = baseHpCount * 0.2;
+      state.player.hpCount = baseHpCount + hpDelta;
       state.player.hp = Math.min(
-        Number(state.player.hp || 0) * 1.2,
+        Number(state.player.hp || 0) + hpDelta,
         Number(state.player.hpCount || 0)
       );
       state.player.stopRound = Number(state.player.stopRound || 0) + 3;

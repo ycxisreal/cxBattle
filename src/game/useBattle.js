@@ -6,6 +6,8 @@ import {
   strengths,
   blessings,
   equipmentAffixes,
+  progression as runtimeProgression,
+  saveProgressionData,
 } from "./data/runtimeData.js";
 import { createHookBus } from "./engine/battleHooks.js";
 import {
@@ -42,6 +44,16 @@ const FIRST_ACTION_DELAY_MS = 800;
 const SECOND_ACTION_DELAY_MS = 800;
 const ROUND_END_DELAY_MS = 1000;
 const CRIT_FLOAT_TRIGGER_RATE = 0.75;
+const MID_DRAFT_FIXED_HEAL_OPTION_ID = "__mid-draft-fixed-heal__";
+const MID_DRAFT_FIXED_HEAL_RATE = 0.6;
+const DEFAULT_GLOBAL_POINT_TOTAL = 0;
+const GLOBAL_POINT_MAX_TOTAL = 300;
+const BASE_POINT_FACTOR = 0.8;
+const TIER_POINT_FACTOR = 0.2;
+const MODE_POINT_MULTIPLIER = {
+  chain: 1,
+  normal: 1,
+};
 const CRIT_PAIN_TEXT_POOL = [
   "嘶...好疼！",
   "这一下真重！",
@@ -113,7 +125,142 @@ const DIFFICULTY_CONFIG = {
   },
 };
 
+const DIFFICULTY_POINT_TIER = {
+  normal: 1,
+  hard: 2,
+  extreme: 3,
+  expert: 4,
+  inferno: 5,
+};
+
+const GLOBAL_POINT_RULES = {
+  hpCount: {
+    label: "生命值",
+    bonusPerPoint: 30,
+    maxPoints: 10,
+    displayAsPercent: false,
+    applyToUnit: (unit, bonus) => {
+      unit.hpCount = Number(unit.hpCount || 0) + bonus;
+      unit.hp = Math.min(Number(unit.hp || unit.hpCount), unit.hpCount);
+    },
+  },
+  attack: {
+    label: "攻击力",
+    bonusPerPoint: 3,
+    maxPoints: 10,
+    displayAsPercent: false,
+    applyToUnit: (unit, bonus) => {
+      unit.attack = Number(unit.attack || 0) + bonus;
+      unit.attackDefault = Number(unit.attackDefault || unit.attack) + bonus;
+    },
+  },
+  defence: {
+    label: "防御力",
+    bonusPerPoint: 2,
+    maxPoints: 10,
+    displayAsPercent: false,
+    applyToUnit: (unit, bonus) => {
+      unit.defence = Number(unit.defence || 0) + bonus;
+      unit.defenceDefault = Number(unit.defenceDefault || unit.defence) + bonus;
+    },
+  },
+  speed: {
+    label: "速度",
+    bonusPerPoint: 0.5,
+    maxPoints: 10,
+    displayAsPercent: false,
+    applyToUnit: (unit, bonus) => {
+      unit.speed = Number(unit.speed || 0) + bonus;
+    },
+  },
+  healPerRound: {
+    label: "每回合回复",
+    bonusPerPoint: 1,
+    maxPoints: 10,
+    displayAsPercent: false,
+    applyToUnit: (unit, bonus) => {
+      unit.healPerRound = Number(unit.healPerRound || 0) + bonus;
+    },
+  },
+  criticalRate: {
+    label: "暴击率",
+    bonusPerPoint: 0.02,
+    maxPoints: 10,
+    displayAsPercent: true,
+    applyToUnit: (unit, bonus) => {
+      unit.criticalRate = clamp(Number(unit.criticalRate || 0) + bonus, 0, 1);
+    },
+  },
+  missRate: {
+    label: "闪避率",
+    bonusPerPoint: 0.015,
+    maxPoints: 10,
+    displayAsPercent: true,
+    applyToUnit: (unit, bonus) => {
+      unit.missRate = clamp(Number(unit.missRate || 0) + bonus, 0, 0.7);
+    },
+  },
+  criticalHurtRate: {
+    label: "暴击伤害倍率",
+    bonusPerPoint: 0.08,
+    maxPoints: 10,
+    displayAsPercent: false,
+    applyToUnit: (unit, bonus) => {
+      unit.criticalHurtRate = Number(unit.criticalHurtRate || 1) + bonus;
+    },
+  },
+};
+
+const DEFAULT_UNIT_POINT_ATTRS = ["hpCount", "attack", "defence", "speed"];
+const UNIT_POINT_ATTR_CONFIG = {
+  1: ["hpCount", "attack", "defence", "speed", "criticalRate"],
+  2: ["hpCount", "attack", "criticalRate", "speed", "defence"],
+  3: ["hpCount", "attack", "criticalRate", "missRate", "speed"],
+  4: ["hpCount", "defence", "healPerRound", "attack", "criticalRate"],
+  6: ["hpCount", "attack", "criticalHurtRate", "speed", "defence"],
+  7: ["hpCount", "attack", "defence", "criticalRate", "speed"],
+  10: ["hpCount", "attack", "defence", "healPerRound", "speed"],
+};
+
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+const toFixedNumber = (value, digits = 2) => Number(Number(value || 0).toFixed(digits));
+
+// 中文注释：击杀曲线函数（k 从 1 开始），用于控制连战前中后期点数节奏。
+const getKillCurve = (killIndex = 1) => {
+  const k = Math.max(1, Number(killIndex || 1));
+  if (k <= 4) return 1 + 0.06 * (k - 1);
+  if (k <= 10) return 1.54 + 0.02 * (k - 4);
+  return 1.94 * Math.pow(0.985, k - 10);
+};
+
+// 中文注释：标准化全局点数进度数据，确保存储结构稳定且字段类型可控。
+const normalizeProgression = (raw) => {
+  const totalPoints = clamp(
+    Number(raw?.totalPoints ?? DEFAULT_GLOBAL_POINT_TOTAL),
+    0,
+    GLOBAL_POINT_MAX_TOTAL
+  );
+  const rawAllocations =
+    raw?.allocations &&
+    typeof raw.allocations === "object" &&
+    !Array.isArray(raw.allocations)
+      ? raw.allocations
+      : {};
+  const allocations = {};
+  Object.entries(rawAllocations).forEach(([unitId, attrs]) => {
+    if (!attrs || typeof attrs !== "object" || Array.isArray(attrs)) return;
+    const cleanedAttrs = {};
+    Object.entries(attrs).forEach(([attrKey, pointCount]) => {
+      const nextCount = Math.max(0, Math.floor(Number(pointCount || 0)));
+      if (nextCount > 0) cleanedAttrs[attrKey] = nextCount;
+    });
+    if (Object.keys(cleanedAttrs).length) allocations[String(unitId)] = cleanedAttrs;
+  });
+  return {
+    totalPoints,
+    allocations,
+  };
+};
 
 // 中文注释：从文本池里随机挑选一条文案，用于浮字输出。
 const pickRandomText = (pool, fallback = "") => {
@@ -223,11 +370,16 @@ const createSideLogManager = (state) => ({
 
 export const useBattle = () => {
   let hookBus = createHookBus();
+  let progressionSavePromise = Promise.resolve();
   const state = reactive({
     phase: "select",
     round: 1,
     over: false,
     winner: null,
+    gameOverReason: null,
+    gameOverPointGain: 0,
+    runKillCount: 0,
+    runPointGain: 0,
     randomize: true,
     busy: false,
     activeTurn: null,
@@ -239,6 +391,7 @@ export const useBattle = () => {
     chainGrowthLevel: 0,
     pointsTotal: 0,
     pointsUsed: 0,
+    progression: normalizeProgression(runtimeProgression),
     player: null,
     enemy: null,
     blessings: [],
@@ -322,11 +475,188 @@ export const useBattle = () => {
     state.draft.midDraftQualityWeights = getMidDraftQualityWeights(0);
     state.draft.enemyHalfHpTriggered = false;
     state.sideLog = [];
+    state.runKillCount = 0;
+    state.runPointGain = 0;
   };
 
   const pointsRemaining = computed(() =>
     Math.max(0, Number(state.pointsTotal || 0) - Number(state.pointsUsed || 0))
   );
+
+  // 中文注释：将当前点数进度异步写入 JSON，串行化避免并发写入互相覆盖。
+  const persistProgression = () => {
+    const snapshot = normalizeProgression(state.progression);
+    progressionSavePromise = progressionSavePromise
+      .catch(() => null)
+      .then(async () => {
+        const result = await saveProgressionData(snapshot);
+        if (!result?.ok && !result?.skipped) {
+          sideLog(`点数进度保存失败：${result?.error || "unknown error"}`);
+        }
+      });
+    return progressionSavePromise;
+  };
+
+  // 中文注释：读取指定角色可加点属性配置，未配置时回退默认配置。
+  const getAllowedPointAttrsByUnitId = (unitId) => {
+    const list = UNIT_POINT_ATTR_CONFIG[Number(unitId)];
+    const attrs = Array.isArray(list) && list.length ? list : DEFAULT_UNIT_POINT_ATTRS;
+    return attrs.filter((attrKey) => GLOBAL_POINT_RULES[attrKey]);
+  };
+
+  // 中文注释：获取指定角色的加点分配映射（attrKey -> pointCount）。
+  const getUnitPointAllocation = (unitId) => {
+    const key = String(unitId);
+    if (!state.progression.allocations[key]) {
+      state.progression.allocations[key] = {};
+    }
+    return state.progression.allocations[key];
+  };
+
+  // 中文注释：获取某属性已投入点数。
+  const getAllocatedPointCount = (unitId, attrKey) => {
+    const allocation = getUnitPointAllocation(unitId);
+    return Math.max(0, Number(allocation[attrKey] || 0));
+  };
+
+  // 中文注释：计算某属性因加点带来的数值增量。
+  const getAttributeBonusValue = (unitId, attrKey) => {
+    const rule = GLOBAL_POINT_RULES[attrKey];
+    if (!rule) return 0;
+    return toFixedNumber(getAllocatedPointCount(unitId, attrKey) * Number(rule.bonusPerPoint || 0));
+  };
+
+  // 中文注释：全局点数统计（总点数、已用点数、剩余点数）。
+  const globalPointSummary = computed(() => {
+    const usedPoints = Object.values(state.progression.allocations || {}).reduce(
+      (sum, unitAllocation) =>
+        sum +
+        Object.values(unitAllocation || {}).reduce(
+          (inner, value) => inner + Math.max(0, Number(value || 0)),
+          0
+        ),
+      0
+    );
+    const totalPoints = clamp(
+      Number(state.progression.totalPoints || 0),
+      0,
+      GLOBAL_POINT_MAX_TOTAL
+    );
+    const remainingPoints = Math.max(0, totalPoints - usedPoints);
+    return {
+      totalPoints,
+      usedPoints,
+      remainingPoints,
+    };
+  });
+
+  // 中文注释：返回单个角色的加点行数据，供 UI 渲染“基础值+加成值+已用点数/上限”。
+  const getUnitPointRows = (unitId) => {
+    const unitBase = units.find((item) => Number(item.id) === Number(unitId));
+    if (!unitBase) return [];
+    return getAllowedPointAttrsByUnitId(unitId).map((attrKey) => {
+      const rule = GLOBAL_POINT_RULES[attrKey];
+      const pointCount = getAllocatedPointCount(unitId, attrKey);
+      const baseValue = Number(unitBase[attrKey] || 0);
+      const bonusValue = getAttributeBonusValue(unitId, attrKey);
+      return {
+        attrKey,
+        label: rule.label,
+        baseValue: toFixedNumber(baseValue),
+        bonusValue: toFixedNumber(bonusValue),
+        pointCount,
+        maxPoints: Number(rule.maxPoints || 0),
+        displayAsPercent: Boolean(rule.displayAsPercent),
+      };
+    });
+  };
+
+  // 中文注释：返回全部角色的加点概览，用于选角页“各角色加点情况”列表展示。
+  const getAllUnitPointOverview = () =>
+    units.map((unit) => {
+      const rows = getUnitPointRows(unit.id);
+      const usedPoints = rows.reduce((sum, row) => sum + Number(row.pointCount || 0), 0);
+      return {
+        unitId: unit.id,
+        unitName: unit.name,
+        usedPoints,
+        rowCount: rows.length,
+      };
+    });
+
+  // 中文注释：给指定角色的指定属性加1点（会校验全局剩余点数和单属性上限）。
+  const allocatePointToUnit = (unitId, attrKey) => {
+    const rule = GLOBAL_POINT_RULES[attrKey];
+    if (!rule) {
+      return { ok: false, message: "该属性暂不可加点。" };
+    }
+    const allowedAttrs = getAllowedPointAttrsByUnitId(unitId);
+    if (!allowedAttrs.includes(attrKey)) {
+      return { ok: false, message: "该角色不支持该属性加点。" };
+    }
+    if (globalPointSummary.value.remainingPoints <= 0) {
+      return { ok: false, message: "剩余点数不足。" };
+    }
+    const allocation = getUnitPointAllocation(unitId);
+    const currentPointCount = getAllocatedPointCount(unitId, attrKey);
+    const maxPoints = Math.max(0, Number(rule.maxPoints || 0));
+    if (currentPointCount >= maxPoints) {
+      return { ok: false, message: `${rule.label}已达到加点上限。` };
+    }
+    allocation[attrKey] = currentPointCount + 1;
+    persistProgression();
+    return { ok: true };
+  };
+
+  // 中文注释：给指定角色的指定属性减1点（已为0时不可继续减少）。
+  const deallocatePointFromUnit = (unitId, attrKey) => {
+    const rule = GLOBAL_POINT_RULES[attrKey];
+    if (!rule) {
+      return { ok: false, message: "该属性暂不可减点。" };
+    }
+    const allowedAttrs = getAllowedPointAttrsByUnitId(unitId);
+    if (!allowedAttrs.includes(attrKey)) {
+      return { ok: false, message: "该角色不支持该属性加点。" };
+    }
+    const allocation = getUnitPointAllocation(unitId);
+    const currentPointCount = getAllocatedPointCount(unitId, attrKey);
+    if (currentPointCount <= 0) {
+      return { ok: false, message: `${rule.label}当前没有可减少的点数。` };
+    }
+    allocation[attrKey] = currentPointCount - 1;
+    persistProgression();
+    return { ok: true };
+  };
+
+  // 中文注释：重置某个角色的全部加点分配并返还点数。
+  const resetUnitPointAllocation = (unitId) => {
+    const key = String(unitId);
+    if (!state.progression.allocations[key]) {
+      state.progression.allocations[key] = {};
+      return { ok: true, resetPoints: 0 };
+    }
+    const resetPoints = Object.values(state.progression.allocations[key] || {}).reduce(
+      (sum, value) => sum + Math.max(0, Number(value || 0)),
+      0
+    );
+    state.progression.allocations[key] = {};
+    persistProgression();
+    return { ok: true, resetPoints };
+  };
+
+  // 中文注释：将某角色已分配的加点增益应用到战斗实例，确保开局属性立刻生效。
+  const applyPointAllocationToUnit = (unit, unitId) => {
+    if (!unit) return;
+    const attrs = getAllowedPointAttrsByUnitId(unitId);
+    attrs.forEach((attrKey) => {
+      const rule = GLOBAL_POINT_RULES[attrKey];
+      if (!rule) return;
+      const bonus = getAttributeBonusValue(unitId, attrKey);
+      if (!bonus) return;
+      rule.applyToUnit(unit, bonus);
+    });
+    unit.hp = clamp(Number(unit.hp || 0), 0, Number(unit.hpCount || 0));
+  };
 
   // 读取祝福重复规则，repeatable=false 时强制上限为1。
   const getBlessingLimit = (blessingDef) => {
@@ -431,27 +761,36 @@ export const useBattle = () => {
     return { ok: true, stacked: false };
   };
 
+  // 中文注释：计算固定回血选项可恢复的生命值（按最大生命百分比）。
+  const getMidDraftHealAmount = () => {
+    if (!state.player) return 0;
+    return Math.max(1, Math.floor(Number(state.player.hpCount || 0) * MID_DRAFT_FIXED_HEAL_RATE));
+  };
+
+  // 中文注释：创建战中三选一的固定回血选项，始终与祝福候选一起展示。
+  const createMidDraftHealOption = () => ({
+    id: MID_DRAFT_FIXED_HEAL_OPTION_ID,
+    type: "heal",
+    quality: "S",
+    name: "生命灌注",
+    desc: `立即回复${Math.round(MID_DRAFT_FIXED_HEAL_RATE * 100)}%最大生命值`,
+    cost: 0,
+    healAmount: getMidDraftHealAmount(),
+  });
+
   // 生成战中三选一候选并置为待选择；返回是否成功打开三选一。
   const openMidDraft = (reasonText) => {
     if (state.over || state.draft.prePending || state.draft.midPending) return false;
     const availablePool = getAvailableBlessingPool();
-    // 若可获取祝福已全部达上限，则改为发放生命上限与生命值奖励。
-    if (!availablePool.length) {
-      if (state.player) {
-        state.player.hpCount = Number(state.player.hpCount || 0) + 10;
-        state.player.hp = Math.min(
-          Number(state.player.hp || 0) + 10,
-          state.player.hpCount
-        );
-        sideLog(`祝福池已满：${reasonText}，改为获得 +10 生命上限与 +10 生命值。`);
-      }
-      return false;
-    }
     const qualityWeights = getMidDraftQualityWeights(state.draft.midDraftOpenCount);
-    state.draft.midCandidates = buildMidDraftCandidates(availablePool, 3, {
+    const blessingCandidates = buildMidDraftCandidates(availablePool, 3, {
       midDraftCount: state.draft.midDraftOpenCount,
       qualityWeights,
-    });
+    }).map((item) => ({
+      ...item,
+      type: "blessing",
+    }));
+    state.draft.midCandidates = [...blessingCandidates, createMidDraftHealOption()];
     state.draft.midPending = state.draft.midCandidates.length > 0;
     if (state.draft.midPending) {
       state.draft.midDraftOpenCount += 1;
@@ -472,6 +811,8 @@ export const useBattle = () => {
     state.round = 1;
     state.over = false;
     state.winner = null;
+    state.gameOverReason = null;
+    state.gameOverPointGain = 0;
     state.log = [];
     state.activeTurn = null;
     state.player = createUnitInstance(playerBase, "杨春潇");
@@ -479,6 +820,7 @@ export const useBattle = () => {
     state.enemyIndex = 1;
     state.draft.enemyHalfHpTriggered = false;
     if (state.randomize) applyRandomMode(state.player);
+    applyPointAllocationToUnit(state.player, playerBase.id);
     log(`战斗初始化：${state.player.name} vs ${state.enemy.name}`);
     logger.push(`第 ${state.round} 回合`, "round", state.round);
     startPreDraft();
@@ -590,10 +932,21 @@ export const useBattle = () => {
   };
 
   // 选择战中三选一祝福并安装。
-  const chooseMidDraftBlessing = (blessingId) => {
+  const chooseMidDraftBlessing = (optionId) => {
     if (!state.draft.midPending) return;
-    const blessingDef = state.draft.midCandidates.find((item) => item.id === blessingId);
-    if (!blessingDef) return;
+    const selectedOption = state.draft.midCandidates.find((item) => item.id === optionId);
+    if (!selectedOption) return;
+    if (selectedOption.type === "heal") {
+      if (!state.player) return;
+      const healValue = getMidDraftHealAmount();
+      const beforeHp = Number(state.player.hp || 0);
+      state.player.hp = clamp(beforeHp + healValue, 0, Number(state.player.hpCount || 0));
+      state.draft.midPending = false;
+      state.draft.midCandidates = [];
+      sideLog(`已选择固定选项：回复生命 ${Math.max(0, state.player.hp - beforeHp)} 点。`);
+      return;
+    }
+    const blessingDef = selectedOption;
     const result = grantBlessing(blessingDef);
     if (!result?.ok) {
       sideLog(result?.message || "祝福获取失败");
@@ -685,6 +1038,16 @@ export const useBattle = () => {
   // 检查战斗是否结束；连战模式下击败敌人会直接切入下一名敌人。
   const checkOver = (attacker, defender) => {
     if (defender.hp <= 0) {
+      if (defender === state.enemy) {
+        const killIndex = Number(state.runKillCount || 0) + 1;
+        const pointGain = getPointGainByKill(killIndex);
+        state.runKillCount = killIndex;
+        state.runPointGain = Number(state.runPointGain || 0) + pointGain;
+        addGlobalPoints(pointGain);
+        sideLog(
+          `击杀奖励：+${pointGain} 点（第${killIndex}杀，本局累计 ${state.runPointGain} 点）`
+        );
+      }
       if (defender === state.enemy && state.chainMode) {
         log(`${attacker.owner}击败了第${state.enemyIndex}个敌人`);
         spawnNextEnemy();
@@ -693,6 +1056,9 @@ export const useBattle = () => {
       }
       state.over = true;
       state.winner = attacker.owner;
+      state.gameOverReason =
+        defender === state.enemy ? "enemy_defeated_non_chain" : "player_defeated";
+      state.gameOverPointGain = Number(state.runPointGain || 0);
       log(`${attacker.owner}的${attacker.name}赢得了战斗！`);
       return { ended: true, skipRemainingTurn: true };
     }
@@ -858,13 +1224,45 @@ export const useBattle = () => {
 
   const availableUnits = computed(() => units);
 
+  // 中文注释：为后续点数结算预留入口，可在战后结算时调用。
+  const addGlobalPoints = (value) => {
+    const next = Math.max(0, Number(value || 0));
+    if (!next) return;
+    state.progression.totalPoints = clamp(
+      Number(state.progression.totalPoints || 0) + next,
+      0,
+      GLOBAL_POINT_MAX_TOTAL
+    );
+    persistProgression();
+  };
+
+  // 中文注释：根据当前是否连战，返回模式倍率（后续若新增连战子模式可在此扩展）。
+  const getCurrentModePointMultiplier = () =>
+    state.chainMode ? Number(MODE_POINT_MULTIPLIER.chain || 1) : Number(MODE_POINT_MULTIPLIER.normal || 1);
+
+  // 中文注释：按“难度层级 + 模式倍率 + 击杀曲线”计算本次击杀点数。
+  const getPointGainByKill = (killIndex) => {
+    const difficultyTier = Number(DIFFICULTY_POINT_TIER[state.difficulty] || 1);
+    const modeMul = getCurrentModePointMultiplier();
+    const killCurve = getKillCurve(killIndex);
+    return Math.round((BASE_POINT_FACTOR + TIER_POINT_FACTOR * difficultyTier) * modeMul * killCurve);
+  };
+
   const backToSelect = () => {
     state.phase = "select";
     state.over = false;
     state.busy = false;
     state.activeTurn = null;
     state.log = [];
+    state.gameOverReason = null;
+    state.gameOverPointGain = 0;
     resetDraftState();
+  };
+
+  // 中文注释：供 UI 在弹窗确认后清理本局结束信息，避免重复弹出。
+  const clearGameOverMeta = () => {
+    state.gameOverReason = null;
+    state.gameOverPointGain = 0;
   };
 
   return {
@@ -874,6 +1272,7 @@ export const useBattle = () => {
     availableUnits,
     difficultyOptions: DIFFICULTY_OPTIONS,
     pointsRemaining,
+    globalPointSummary,
     resetBattle,
     setDifficulty,
     toggleChainMode,
@@ -885,5 +1284,12 @@ export const useBattle = () => {
     refreshPreDraftCandidates,
     confirmPreDraft,
     chooseMidDraftBlessing,
+    clearGameOverMeta,
+    getUnitPointRows,
+    getAllUnitPointOverview,
+    allocatePointToUnit,
+    deallocatePointFromUnit,
+    resetUnitPointAllocation,
+    addGlobalPoints,
   };
 };
