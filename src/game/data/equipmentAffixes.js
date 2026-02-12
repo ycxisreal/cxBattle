@@ -1,4 +1,4 @@
-export const equipmentAffixes = [
+﻿export const equipmentAffixes = [
   {
     "key": "attack",
     "label": "攻击",

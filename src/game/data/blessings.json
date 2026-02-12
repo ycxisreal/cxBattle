@@ -285,7 +285,7 @@
     "name": "蜕变新生",
     "quality": "B",
     "cost": 4,
-    "desc": "为自己增加20%生命值与生命上限，但3回合无法行动",
+    "desc": "为自己增加当前生命上限20%的生命值，并提升20%生命上限，但3回合无法行动",
     "implKey": "renewal",
     "repeatable": false,
     "maxStack": 1,

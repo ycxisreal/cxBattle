@@ -1,4 +1,4 @@
-export const units = [
+﻿export const units = [
   {
     "id": 1,
     "name": "战士",
@@ -26,7 +26,7 @@ export const units = [
       35,
       36
     ],
-    "missRate": 0.1,
+    "missRate": 0.05,
     "criticalRate": 0.1,
     "criticalHurtRate": 1.5,
     "healPerRound": 0,
@@ -65,7 +65,7 @@ export const units = [
       35,
       36
     ],
-    "missRate": 0.1,
+    "missRate": 0.05,
     "criticalRate": 0.15,
     "criticalHurtRate": 2,
     "healPerRound": 0,
@@ -103,7 +103,7 @@ export const units = [
       35,
       36
     ],
-    "missRate": 0.12,
+    "missRate": 0.06,
     "criticalRate": 0.3,
     "criticalHurtRate": 1.8,
     "healPerRound": 0,
@@ -141,7 +141,7 @@ export const units = [
       35,
       36
     ],
-    "missRate": 0.05,
+    "missRate": 0.02,
     "criticalRate": 0.08,
     "criticalHurtRate": 1.2,
     "healPerRound": 2,
@@ -178,7 +178,7 @@ export const units = [
       35,
       36
     ],
-    "missRate": 0.12,
+    "missRate": 0.06,
     "criticalRate": 0.18,
     "criticalHurtRate": 2.2,
     "healPerRound": 0,
@@ -221,7 +221,7 @@ export const units = [
       35,
       36
     ],
-    "missRate": 0.08,
+    "missRate": 0.04,
     "criticalRate": 0.05,
     "criticalHurtRate": 1.2,
     "healPerRound": 0,
@@ -258,7 +258,7 @@ export const units = [
       35,
       36
     ],
-    "missRate": 0.05,
+    "missRate": 0.02,
     "criticalRate": 0.1,
     "criticalHurtRate": 1.6,
     "healPerRound": 5,

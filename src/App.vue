@@ -486,22 +486,25 @@ const midDraftQualityWeightsDisplay = computed(() => {
 <template>
   <div class="app">
     <div v-if="state.phase === 'select'" class="select-layout">
-      <header class="hero">
-        <div>
-          <p class="kicker">Turn-based Combo Game</p>
-          <h1>cxBattle</h1>
-          <p class="subtitle">
-          </p>
-        </div>
-        <div class="hero-actions">
-          <button class="primary" type="button" @click="toggleRandomize">
-            {{ state.randomize ? "关闭随机倍率影响" : "开启随机倍率影响" }}
-          </button>
-        </div>
-      </header>
+      <aside class="select-side select-side-left">
+        <header class="hero">
+          <div>
+            <p class="kicker">Turn-based Combo Game</p>
+            <h1>cxBattle</h1>
+            <p class="subtitle">
+            </p>
+          </div>
+          <div class="hero-actions">
+            <button class="primary" type="button" @click="toggleRandomize">
+              {{ state.randomize ? "关闭随机倍率影响" : "开启随机倍率影响" }}
+            </button>
+          </div>
+        </header>
+      </aside>
 
-      <section class="select">
-          <div class="select-panel">
+      <main class="select-main">
+        <section class="select">
+            <div class="select-panel">
             <div class="select-head">
               <h3>选择你的角色</h3>
               <p>选择一名角色进入战斗，对手将随机生成。</p>
@@ -569,24 +572,33 @@ const midDraftQualityWeightsDisplay = computed(() => {
             >
               进入战斗
             </button>
-            <div class="point-panel">
-              <p class="point-panel-title">加点模块</p>
-              <p class="point-line">剩余点数：{{ globalPointSummary.remainingPoints }}</p>
-              <p class="point-line">已获得点数：{{ globalPointSummary.totalPoints }} / 300</p>
-              <p class="point-line">已使用点数：{{ globalPointSummary.usedPoints }}</p>
-              <ul class="point-overview-list">
-                <li v-for="item in pointOverviewList" :key="`point-overview-${item.unitId}`">
-                  {{ item.unitName }}：{{ item.usedPoints }} 点
-                </li>
-              </ul>
-              <button class="ghost point-open-btn" type="button" @click="openPointModal">
-                开始加点
-              </button>
-            </div>
           </aside>
-      </section>
+        </section>
+        <div class="select-bottom-center">
+          <CustomDataPanel />
+        </div>
+      </main>
 
-      <CustomDataPanel />
+      <aside class="select-side select-side-right">
+        <div class="select-point">
+          <h3>加点</h3>
+          <div class="point-panel">
+            <p class="point-panel-title">加点模块</p>
+            <p class="point-line">剩余点数：{{ globalPointSummary.remainingPoints }}</p>
+            <p class="point-line">已获得点数：{{ globalPointSummary.totalPoints }} / 300</p>
+            <p class="point-line">已使用点数：{{ globalPointSummary.usedPoints }}</p>
+            <ul class="point-overview-list">
+              <li v-for="item in pointOverviewList" :key="`point-overview-${item.unitId}`">
+                {{ item.unitName }}：{{ item.usedPoints }} 点
+              </li>
+            </ul>
+            <button class="ghost point-open-btn" type="button" @click="openPointModal">
+              开始加点
+            </button>
+          </div>
+        </div>
+      </aside>
+
     </div>
 
     <section v-if="state.phase === 'battle'" class="battle-layout">
@@ -606,6 +618,7 @@ const midDraftQualityWeightsDisplay = computed(() => {
             <button class="sidebar-tab random-rate-btn" type="button" @click="toggleRandomize">
               {{ state.randomize ? "关闭随机倍率影响" : "开启随机倍率影响" }}
             </button>
+            <div class="side-log-title">* 随机倍率影响:游戏中大部分数据会受到角色随机倍率的影响</div>
           </div>
           <div class="difficulty-quick">
             <p class="difficulty-current">
@@ -1184,11 +1197,33 @@ const midDraftQualityWeightsDisplay = computed(() => {
 }
 
 .select-layout {
-  width: min(100%, var(--center-column-width));
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 28px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, var(--center-column-width)) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.select-main {
+  min-width: 0;
+}
+
+.select-bottom-center {
+  margin-top: 18px;
+  width: 100%;
+}
+
+.select-bottom-center :deep(.custom-module) {
+  width: 100%;
+}
+
+.select-side {
+  min-height: 100%;
+}
+
+.select-side-left,
+.select-side-right {
+  position: sticky;
+  top: 20px;
 }
 
 .hero {
@@ -1857,12 +1892,13 @@ h1 {
 
 .select {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+  grid-template-columns: minmax(0, 3fr) minmax(320px, 2fr);
   gap: 18px;
 }
 
 .select-panel,
-.select-preview {
+.select-preview,
+.select-point {
   border-radius: 24px;
   padding: 24px;
   background: rgba(8, 12, 20, 0.85);
@@ -1870,7 +1906,8 @@ h1 {
 }
 
 .select-head h3,
-.select-preview h3 {
+.select-preview h3,
+.select-point h3 {
   margin: 0 0 6px;
   font-size: 20px;
 }
@@ -1949,8 +1986,13 @@ h1 {
   align-self: flex-start;
 }
 
+.select-point {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 .point-panel {
-  margin-top: 4px;
   padding: 12px;
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -2313,7 +2355,30 @@ h1 {
   box-shadow: 0 10px 24px rgba(232, 64, 64, 0.42);
 }
 
+@media (max-width: 1360px) {
+  .select-layout {
+    grid-template-columns: minmax(0, var(--center-column-width)) minmax(320px, 1fr);
+  }
+
+  .select-side-left {
+    display: none;
+  }
+}
+
 @media (max-width: 1024px) {
+  .select-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .select-side-left {
+    display: block;
+  }
+
+  .select-side-left,
+  .select-side-right {
+    position: static;
+  }
+
   .battle-layout {
     grid-template-columns: 1fr;
   }

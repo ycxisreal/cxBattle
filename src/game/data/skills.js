@@ -1,4 +1,4 @@
-export const skills = [
+﻿export const skills = [
   {
     "id": 1,
     "name": "火球术【法师】",
@@ -167,21 +167,21 @@ export const skills = [
   {
     "id": 10,
     "name": "迅捷移动【小丑】",
-    "des": "提高移动速度，但会减少护甲",
+    "des": "提高0.5移动速度，并施加10点伤害加成2回合",
     "power": 0,
     "suckBloodRate": 0,
     "putStatus": [
       {
-        "name": "armor",
+        "name": "damage",
         "round": 2,
-        "value": -2
+        "value": 10
       }
     ],
     "changeValue": [
       {
         "self": true,
         "name": "speed",
-        "value": 2
+        "value": 0.5
       }
     ],
     "accuracy": 1,
@@ -246,19 +246,19 @@ export const skills = [
   {
     "id": 14,
     "name": "灵魂汲取【武僧】",
-    "des": "从敌人身上吸取生命力来治疗自身。减少对方5点生命上限，80%伤害转换为自身生命",
+    "des": "从敌人身上吸取生命力来治疗自身。减少对方5点生命上限，20%伤害转换为自身生命",
     "power": 22,
-    "suckBloodRate": 0.8,
+    "suckBloodRate": 0.2,
     "putStatus": [],
     "changeValue": [
       {
-        "self": true,
+        "self": false,
         "name": "hpCount",
-        "value": 5
+        "value": -5
       }
     ],
     "accuracy": 0.8,
-    "criticalRate": 0.05
+    "criticalRate": 0.03
   },
   {
     "id": 15,
@@ -359,7 +359,7 @@ export const skills = [
   {
     "id": 20,
     "name": "精准强化【武僧】",
-    "des": "集中能量，使暴击概率提高15%。",
+    "des": "集中能量，使暴击概率提高4%。",
     "power": 0,
     "suckBloodRate": 0,
     "putStatus": [],
@@ -367,7 +367,7 @@ export const skills = [
       {
         "self": true,
         "name": "criticalRate",
-        "rate": 0.15
+        "rate": 0.04
       }
     ],
     "accuracy": 0.75,
@@ -384,7 +384,7 @@ export const skills = [
       {
         "self": false,
         "name": "defence",
-        "value": 0
+        "value": 5
       }
     ],
     "accuracy": 0.7,

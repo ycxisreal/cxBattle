@@ -167,21 +167,21 @@
   {
     "id": 10,
     "name": "迅捷移动【小丑】",
-    "des": "提高移动速度，但会减少护甲",
+    "des": "提高0.5移动速度，并施加10点伤害加成2回合",
     "power": 0,
     "suckBloodRate": 0,
     "putStatus": [
       {
-        "name": "armor",
+        "name": "damage",
         "round": 2,
-        "value": -2
+        "value": 10
       }
     ],
     "changeValue": [
       {
         "self": true,
         "name": "speed",
-        "value": 2
+        "value": 0.5
       }
     ],
     "accuracy": 1,

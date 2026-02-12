@@ -1,4 +1,4 @@
-export const blessings = [
+﻿export const blessings = [
   {
     "id": 1001,
     "name": "战意沸腾",

@@ -55,18 +55,18 @@ const MODE_POINT_MULTIPLIER = {
   normal: 1,
 };
 const CRIT_PAIN_TEXT_POOL = [
-  "嘶...好疼！",
-  "这一下真重！",
-  "可恶，被打中了！",
+  "啊啊啊！",
+  "好痛！",
+  "哎呦卧槽！",
   "痛痛痛！",
-  "差点站不稳！",
+  "疼死我了！",
 ];
 const CRIT_TAUNT_TEXT_POOL = [
-  "就这？再来！",
-  "看到差距了吗？",
-  "这才叫暴击！",
-  "你防不住我。",
-  "继续挣扎吧。",
+  "哈哈！",
+  "爽！",
+  "太爽了！",
+  "战斗，爽！",
+  "很痛吧？",
 ];
 
 const DIFFICULTY_OPTIONS = [
@@ -136,7 +136,7 @@ const DIFFICULTY_POINT_TIER = {
 const GLOBAL_POINT_RULES = {
   hpCount: {
     label: "生命值",
-    bonusPerPoint: 30,
+    bonusPerPoint: 8,
     maxPoints: 10,
     displayAsPercent: false,
     applyToUnit: (unit, bonus) => {
@@ -146,8 +146,8 @@ const GLOBAL_POINT_RULES = {
   },
   attack: {
     label: "攻击力",
-    bonusPerPoint: 3,
-    maxPoints: 10,
+    bonusPerPoint: 2,
+    maxPoints: 7,
     displayAsPercent: false,
     applyToUnit: (unit, bonus) => {
       unit.attack = Number(unit.attack || 0) + bonus;
@@ -157,7 +157,7 @@ const GLOBAL_POINT_RULES = {
   defence: {
     label: "防御力",
     bonusPerPoint: 2,
-    maxPoints: 10,
+    maxPoints: 7,
     displayAsPercent: false,
     applyToUnit: (unit, bonus) => {
       unit.defence = Number(unit.defence || 0) + bonus;
@@ -166,8 +166,8 @@ const GLOBAL_POINT_RULES = {
   },
   speed: {
     label: "速度",
-    bonusPerPoint: 0.5,
-    maxPoints: 10,
+    bonusPerPoint: 0.3,
+    maxPoints: 7,
     displayAsPercent: false,
     applyToUnit: (unit, bonus) => {
       unit.speed = Number(unit.speed || 0) + bonus;
@@ -176,7 +176,7 @@ const GLOBAL_POINT_RULES = {
   healPerRound: {
     label: "每回合回复",
     bonusPerPoint: 1,
-    maxPoints: 10,
+    maxPoints: 15,
     displayAsPercent: false,
     applyToUnit: (unit, bonus) => {
       unit.healPerRound = Number(unit.healPerRound || 0) + bonus;
@@ -194,7 +194,7 @@ const GLOBAL_POINT_RULES = {
   missRate: {
     label: "闪避率",
     bonusPerPoint: 0.015,
-    maxPoints: 10,
+    maxPoints: 7,
     displayAsPercent: true,
     applyToUnit: (unit, bonus) => {
       unit.missRate = clamp(Number(unit.missRate || 0) + bonus, 0, 0.7);
@@ -213,13 +213,13 @@ const GLOBAL_POINT_RULES = {
 
 const DEFAULT_UNIT_POINT_ATTRS = ["hpCount", "attack", "defence", "speed"];
 const UNIT_POINT_ATTR_CONFIG = {
-  1: ["hpCount", "attack", "defence", "speed", "criticalRate"],
-  2: ["hpCount", "attack", "criticalRate", "speed", "defence"],
-  3: ["hpCount", "attack", "criticalRate", "missRate", "speed"],
-  4: ["hpCount", "defence", "healPerRound", "attack", "criticalRate"],
+  1: ["hpCount", "attack", "healPerRound", "speed", "criticalRate"],
+  2: ["hpCount", "healPerRound", "criticalRate", "speed", "defence"],
+  3: ["hpCount", "attack", "criticalRate", "defence", "criticalHurtRate"],
+  4: ["hpCount", "speed", "criticalHurtRate", "attack", "criticalRate"],
   6: ["hpCount", "attack", "criticalHurtRate", "speed", "defence"],
-  7: ["hpCount", "attack", "defence", "criticalRate", "speed"],
-  10: ["hpCount", "attack", "defence", "healPerRound", "speed"],
+  7: ["hpCount", "attack", "defence", "criticalRate", "healPerRound"],
+  10: ["hpCount", "attack", "defence", "missRate", "speed"],
 };
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));

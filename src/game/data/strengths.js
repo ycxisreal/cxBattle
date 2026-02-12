@@ -1,4 +1,4 @@
-export const strengths = [
+﻿export const strengths = [
   {
     "id": 1,
     "name": "稳定打击",

@@ -1,4 +1,4 @@
-export const progression = {
+﻿export const progression = {
   totalPoints: 0,
   allocations: {},
 };
