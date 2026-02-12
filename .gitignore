@@ -42,3 +42,4 @@ release/
 dist-electron/
 /doc/
 progression.json
+AGENTS.md
