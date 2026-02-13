@@ -640,7 +640,7 @@ const midDraftQualityWeightsDisplay = computed(() => {
             </button>
             <div v-if="state.chainMode">
               <div class="enemy-index-text">每击败 1 个敌人，下一名敌人额外获得：</div>
-              <div class="enemy-index-text">- 生命/攻击/防御倍率：首次 +5%，后续每次 +5%，上限 +15%</div>
+              <div class="enemy-index-text">- 生命/攻击/防御倍率：按 2%/4%/6%... 累加，单次增幅上限 +6%</div>
               <div class="enemy-index-text">- 每回合回复：+1</div>
               <div class="enemy-index-text">- 暴击伤害倍率：+10%</div>
             </div>

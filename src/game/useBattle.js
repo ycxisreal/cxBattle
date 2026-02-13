@@ -35,8 +35,8 @@ const MAX_SIDE_LOGS = 10;
 const PRE_DRAFT_REFRESH_COST = 1;
 const DEFAULT_MID_DRAFT_INTERVAL = 10;
 const MAX_EQUIPMENT_SLOTS = 2;
-const CHAIN_ENEMY_GROWTH_STEP_PER_KILL = 0.05;
-const CHAIN_ENEMY_GROWTH_MAX_RATE = 0.15;
+const CHAIN_ENEMY_GROWTH_STEP_PER_KILL = 0.02;
+const CHAIN_ENEMY_GROWTH_MAX_RATE = 0.06;
 const CHAIN_ENEMY_HEAL_BONUS_PER_KILL = 1;
 const CHAIN_ENEMY_CRIT_HURT_BONUS_PER_KILL = 0.1;
 const MID_DRAFT_HALF_HP_TRIGGER_START_ENEMY_INDEX = 5;
@@ -268,11 +268,22 @@ const pickRandomText = (pool, fallback = "") => {
   return String(pool[Math.floor(Math.random() * pool.length)] || fallback);
 };
 
-// 连战生命/攻击/防御成长率：首次5%，之后每击杀+5%，最高15%。
-const getChainEnemyGrowthRate = (growthLevel = 0) => {
+// 中文注释：连战单次成长率（第n次击杀对应 n*2%，单次最高6%）。
+const getChainEnemyGrowthIncrementRate = (growthLevel = 0) => {
   const level = Math.max(0, Number(growthLevel || 0));
   if (!level) return 0;
   return Math.min(level * CHAIN_ENEMY_GROWTH_STEP_PER_KILL, CHAIN_ENEMY_GROWTH_MAX_RATE);
+};
+
+// 中文注释：连战总成长率（将每次击杀的单次成长率累加，单次成长率封顶后继续按6%累加）。
+const getChainEnemyGrowthRate = (growthLevel = 0) => {
+  const level = Math.max(0, Number(growthLevel || 0));
+  if (!level) return 0;
+  let totalRate = 0;
+  for (let i = 1; i <= level; i += 1) {
+    totalRate += getChainEnemyGrowthIncrementRate(i);
+  }
+  return totalRate;
 };
 
 // 为指定单位补充不重复的随机被动特长。
@@ -399,8 +410,10 @@ export const useBattle = () => {
     draft: {
       prePending: false,
       midPending: false,
+      midDraftTriggerSource: "",
       preCandidates: [],
       midCandidates: [],
+      pendingTurnAfterMidDraft: null,
       selectedPreIds: [],
       refreshCost: PRE_DRAFT_REFRESH_COST,
       midDraftRoundInterval: DEFAULT_MID_DRAFT_INTERVAL,
@@ -468,8 +481,10 @@ export const useBattle = () => {
     state.equipments = [];
     state.draft.prePending = false;
     state.draft.midPending = false;
+    state.draft.midDraftTriggerSource = "";
     state.draft.preCandidates = [];
     state.draft.midCandidates = [];
+    state.draft.pendingTurnAfterMidDraft = null;
     state.draft.selectedPreIds = [];
     state.draft.midDraftOpenCount = 0;
     state.draft.midDraftQualityWeights = getMidDraftQualityWeights(0);
@@ -705,7 +720,9 @@ export const useBattle = () => {
     sideLog(
       `连战成长：下一敌人生命/攻击/防御 +${Math.round(
         getChainEnemyGrowthRate(state.chainGrowthLevel) * 100
-      )}%，回复 +${state.chainGrowthLevel}`
+      )}%（本次增量 +${Math.round(
+        getChainEnemyGrowthIncrementRate(state.chainGrowthLevel) * 100
+      )}%），回复 +${state.chainGrowthLevel}`
     );
   };
 
@@ -779,7 +796,7 @@ export const useBattle = () => {
   });
 
   // 生成战中三选一候选并置为待选择；返回是否成功打开三选一。
-  const openMidDraft = (reasonText) => {
+  const openMidDraft = (reasonText, source = "generic") => {
     if (state.over || state.draft.prePending || state.draft.midPending) return false;
     const availablePool = getAvailableBlessingPool();
     const qualityWeights = getMidDraftQualityWeights(state.draft.midDraftOpenCount);
@@ -793,11 +810,13 @@ export const useBattle = () => {
     state.draft.midCandidates = [...blessingCandidates, createMidDraftHealOption()];
     state.draft.midPending = state.draft.midCandidates.length > 0;
     if (state.draft.midPending) {
+      state.draft.midDraftTriggerSource = String(source || "generic");
       state.draft.midDraftOpenCount += 1;
       state.draft.midDraftQualityWeights = getMidDraftQualityWeights(state.draft.midDraftOpenCount);
       sideLog(`祝福三选一触发：${reasonText}`);
       return true;
     }
+    state.draft.midDraftTriggerSource = "";
     return false;
   };
 
@@ -932,7 +951,7 @@ export const useBattle = () => {
   };
 
   // 选择战中三选一祝福并安装。
-  const chooseMidDraftBlessing = (optionId) => {
+  const chooseMidDraftBlessing = async (optionId) => {
     if (!state.draft.midPending) return;
     const selectedOption = state.draft.midCandidates.find((item) => item.id === optionId);
     if (!selectedOption) return;
@@ -943,7 +962,12 @@ export const useBattle = () => {
       state.player.hp = clamp(beforeHp + healValue, 0, Number(state.player.hpCount || 0));
       state.draft.midPending = false;
       state.draft.midCandidates = [];
+      const shouldResumeTurn = state.draft.midDraftTriggerSource === "enemy_half_hp";
+      state.draft.midDraftTriggerSource = "";
       sideLog(`已选择固定选项：回复生命 ${Math.max(0, state.player.hp - beforeHp)} 点。`);
+      if (shouldResumeTurn) {
+        await resumeTurnAfterMidDraft();
+      }
       return;
     }
     const blessingDef = selectedOption;
@@ -954,8 +978,13 @@ export const useBattle = () => {
     }
     state.draft.midPending = false;
     state.draft.midCandidates = [];
+    const shouldResumeTurn = state.draft.midDraftTriggerSource === "enemy_half_hp";
+    state.draft.midDraftTriggerSource = "";
     const stackText = state.blessings.find((item) => item.id === blessingDef.id)?.stack || 1;
     sideLog(`已获得祝福：${blessingDef.name}（当前层数 ${stackText}）`);
+    if (shouldResumeTurn) {
+      await resumeTurnAfterMidDraft();
+    }
   };
 
   // 从第5个敌人起：敌方生命首次降至50%及以下时触发一次祝福三选一，换敌后重置。
@@ -966,7 +995,7 @@ export const useBattle = () => {
     if (state.enemy.hp <= 0) return false;
     if (state.enemy.hp > state.enemy.hpCount / 2) return false;
     state.draft.enemyHalfHpTriggered = true;
-    return openMidDraft(`第${state.enemyIndex}个敌人生命首次降至50%`);
+    return openMidDraft(`第${state.enemyIndex}个敌人生命首次降至50%`, "enemy_half_hp");
   };
 
   const resetBattle = () => {
@@ -998,6 +1027,38 @@ export const useBattle = () => {
   // 战斗流程停顿函数：统一控制“行动前摇/两次行动间隔/回合结算前等待”的节奏。
   // 以后如需调快或调慢手感，优先修改上方 *_DELAY_MS 常量，再看是否需要改这里。
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  // 中文注释：清理“半血三选一触发后”需要续行的本回合上下文，避免残留导致错乱。
+  const clearMidDraftTurnContinuation = () => {
+    state.draft.pendingTurnAfterMidDraft = null;
+  };
+
+  // 中文注释：在半血三选一完成后，衔接执行本回合剩余流程（敌方行动与回合收尾）。
+  const resumeTurnAfterMidDraft = async () => {
+    const continuation = state.draft.pendingTurnAfterMidDraft;
+    clearMidDraftTurnContinuation();
+    if (!continuation) return;
+    if (state.over || !state.player || !state.enemy) return;
+    state.busy = true;
+    try {
+      if (continuation.runSecondAction) {
+        const secondActor =
+          continuation.secondActor === "player" ? state.player : state.enemy;
+        const secondTarget = secondActor === state.player ? state.enemy : state.player;
+        const secondSkill = skillIndex.get(continuation.secondSkillId);
+        state.activeTurn = continuation.secondActor;
+        await sleep(SECOND_ACTION_DELAY_MS);
+        await act(secondActor, secondTarget, secondSkill);
+      }
+      if (!state.over && continuation.finalizeRound) {
+        await sleep(ROUND_END_DELAY_MS);
+        finalizeRound();
+      }
+    } finally {
+      state.activeTurn = null;
+      state.busy = false;
+    }
+  };
 
   // 触发受击/状态动画：通过递增 token 驱动 UI 重播动画，避免布尔翻转丢帧。
   const triggerEffect = (target, type) => {
@@ -1031,7 +1092,7 @@ export const useBattle = () => {
     }
     logger.push(`第 ${state.round} 回合`, "round", state.round);
     if (state.round % state.draft.midDraftRoundInterval === 0) {
-      openMidDraft(`到达第${state.round}回合`);
+      openMidDraft(`到达第${state.round}回合`, "round_interval");
     }
   };
 
@@ -1051,7 +1112,7 @@ export const useBattle = () => {
       if (defender === state.enemy && state.chainMode) {
         log(`${attacker.owner}击败了第${state.enemyIndex}个敌人`);
         spawnNextEnemy();
-        openMidDraft(`连战击败第${state.enemyIndex - 1}个敌人`);
+        openMidDraft(`连战击败第${state.enemyIndex - 1}个敌人`, "chain_kill");
         return { ended: false, skipRemainingTurn: true };
       }
       state.over = true;
@@ -1175,15 +1236,48 @@ export const useBattle = () => {
       first === state.player ? state.enemy : state.player,
       firstSkill
     );
+    if (
+      !state.over &&
+      firstResult?.skipRemainingTurn &&
+      state.draft.midPending &&
+      state.draft.midDraftTriggerSource === "enemy_half_hp"
+    ) {
+      state.draft.pendingTurnAfterMidDraft = {
+        runSecondAction: true,
+        secondActor: second === state.player ? "player" : "enemy",
+        secondSkillId: Number(secondSkill?.id || 0),
+        finalizeRound: true,
+      };
+      state.activeTurn = null;
+      state.busy = false;
+      return;
+    }
+    let secondResult = null;
     if (!state.over && !firstResult?.skipRemainingTurn) {
       state.activeTurn = second === state.player ? "player" : "enemy";
       // 第二段停顿：两次行动之间的间隔。
       await sleep(SECOND_ACTION_DELAY_MS);
-      await act(
+      secondResult = await act(
         second,
         second === state.player ? state.enemy : state.player,
         secondSkill
       );
+    }
+    if (
+      !state.over &&
+      secondResult?.skipRemainingTurn &&
+      state.draft.midPending &&
+      state.draft.midDraftTriggerSource === "enemy_half_hp"
+    ) {
+      state.draft.pendingTurnAfterMidDraft = {
+        runSecondAction: false,
+        secondActor: null,
+        secondSkillId: 0,
+        finalizeRound: true,
+      };
+      state.activeTurn = null;
+      state.busy = false;
+      return;
     }
     if (!state.over) {
       // 第三段停顿：回合收尾前预留日志与动画展示时间。
