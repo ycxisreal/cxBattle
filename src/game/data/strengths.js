@@ -107,7 +107,7 @@
       {
         "self": false,
         "name": "defence",
-        "value": 5
+        "value": 2
       }
     ],
     "accuracy": 0.85
@@ -300,19 +300,19 @@
       {
         "self": false,
         "name": "attack",
-        "value": 3
+        "value": 2
       }
     ],
-    "accuracy": 0.85
+    "accuracy": 0.75
   },
   {
     "id": 18,
     "name": "身法",
-    "des": "每回合有概率触发：提高闪避能力。",
+    "des": "每回合有10%概率触发：提高1%闪避能力。",
     "condition": {
       "type": ">=",
       "interval": 1,
-      "dice": 0.25
+      "dice": 0.1
     },
     "power": 0,
     "status": [],
@@ -320,7 +320,7 @@
       {
         "self": true,
         "name": "missRate",
-        "rate": 0.04
+        "rate": 0.01
       }
     ],
     "accuracy": 1

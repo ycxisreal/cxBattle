@@ -94,19 +94,17 @@ const createBlessingRegistry = () => ({
       );
     },
   }),
-  // 击杀时提升攻击力，单次+5，累计上限随祝福层数成长（每层+5）。
+  // 击杀时提升攻击力：每次击杀按当前层数增加（1层+1、2层+2...），不设触发次数上限。
   on_kill_gain_power: ({ state, blessingDef, instance }) => ({
     onKill(ctx) {
       if (!isPlayerActor(ctx, state)) return;
       const stack = getBlessingStack(state, blessingDef.id);
-      const cap = 5 * stack;
-      const gained = Number(instance.state.attackGain || 0);
-      if (gained >= cap) return;
-      state.player.attack = Number(state.player.attack || 0) + 5;
-      instance.state.attackGain = Math.min(cap, gained + 5);
+      const gainPerKill = Math.max(1, stack);
+      state.player.attack = Number(state.player.attack || 0) + gainPerKill;
+      instance.state.attackGainTotal = Number(instance.state.attackGainTotal || 0) + gainPerKill;
       outputBlessingLog(
         ctx,
-        `[祝福] ${blessingDef.name}触发：攻击+5（${instance.state.attackGain}/${cap}）`
+        `[祝福] ${blessingDef.name}触发：攻击+${gainPerKill}（累计+${instance.state.attackGainTotal}）`
       );
     },
   }),

@@ -43,7 +43,7 @@
     "name": "杀戮之力",
     "quality": "A",
     "cost": 2,
-    "desc": "击杀敌人时，自身攻击力提升5，最多5层。",
+    "desc": "击杀敌人时，自身攻击力提升1点；每多1层，额外再提升1点。",
     "implKey": "on_kill_gain_power",
     "repeatable": true,
     "maxStack": 5,
@@ -336,4 +336,3 @@
     "tags": []
   }
 ];
-
