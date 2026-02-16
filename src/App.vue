@@ -53,6 +53,7 @@ const sidebarTabs = [
 const activeSidebarId = ref("skill-formula");
 const showFormulaModal = ref(false);
 const showDifficultyModal = ref(false);
+const pendingStartBattleAfterDifficulty = ref(false);
 const showBlessingsModal = ref(false);
 const showPointModal = ref(false);
 const activePointUnitId = ref(null);
@@ -205,6 +206,13 @@ const closeUnitModal = () => {
 
 const startBattle = () => {
   if (!selectedUnitId.value) return;
+  // 中文注释：从选人页进入战斗时，先打开难度弹窗，确认后再正式开战。
+  pendingStartBattleAfterDifficulty.value = true;
+  showDifficultyModal.value = true;
+};
+
+// 中文注释：统一初始化战斗页技能栏状态，避免多处分支重复逻辑。
+const prepareBattleSkillPanel = () => {
   startBattleWithSelection(selectedUnitId.value);
   // 进入战斗时从技能池随机抽取4个作为默认出招栏。
   autoSkillIds.value = pickRandomSkillIds(playerSkills.value, 4);
@@ -334,6 +342,12 @@ const closeFormulaModal = () => {
 
 const closeDifficultyModal = () => {
   showDifficultyModal.value = false;
+  if (pendingStartBattleAfterDifficulty.value && state.phase === "select") {
+    prepareBattleSkillPanel();
+    pendingStartBattleAfterDifficulty.value = false;
+    difficultyChangedPendingReset.value = false;
+    return;
+  }
   if (difficultyChangedPendingReset.value && state.phase === "battle") {
     resetBattle();
     ElMessage.success("难度已应用，已重新开始战前构筑。");
@@ -2314,7 +2328,7 @@ h1 {
 
 .compact-toggle-btn {
   position: relative;
-  animation: compactToggleBreath 1.8s ease-in-out infinite;
+  animation: compactToggleBreath 2s ease-in-out infinite;
 }
 
 .compact-toggle-btn:hover {
@@ -2351,7 +2365,7 @@ h1 {
     box-shadow: 0 0 0 0 rgba(126, 107, 255, 0.28);
   }
   50% {
-    box-shadow: 0 0 0 0.35rem rgba(126, 107, 255, 0);
+    box-shadow: 0 0 0 0.55rem rgba(126, 107, 255, 0);
   }
   100% {
     box-shadow: 0 0 0 0 rgba(126, 107, 255, 0.28);
