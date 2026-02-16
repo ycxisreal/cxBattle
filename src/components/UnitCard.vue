@@ -288,9 +288,28 @@ const formatCondition = (condition) => {
       </div>
     </div>
     <header>
-      <p class="label">{{ title }}</p>
-      <h2>{{ unit?.name || "--" }}</h2>
-      <p class="sub">拥有者：{{ unit?.owner || "--" }}</p>
+      <div class="title-block">
+        <p class="label">{{ title }}</p>
+        <h2>{{ unit?.name || "--" }}</h2>
+      </div>
+      <button
+        class="strength-btn strength-btn--header"
+        type="button"
+        :disabled="!strengthInfo.length"
+        @click="strengthInfo.length && (showStrengthModal = true)"
+      >
+        被动特长
+        <div class="strength-tooltip">
+          <template v-if="strengthInfo.length">
+            <div v-for="st in strengthInfo" :key="st.id" class="strength-item">
+              <strong>{{ st.name }}</strong>
+              <p>{{ st.des || "暂无描述" }}</p>
+            </div>
+            <div class="strength-hint">点击按钮查看详情</div>
+          </template>
+          <span v-else class="strength-empty">无被动特长</span>
+        </div>
+      </button>
     </header>
     <div class="hp-row">
       <span>HP</span>
@@ -342,25 +361,6 @@ const formatCondition = (condition) => {
         <strong>{{ ((unit?.criticalHurtRate ?? 0) * 100).toFixed(0) }}%</strong>
       </li>
     </ul>
-    <div class="strengths">
-      <button
-        v-if="strengthInfo.length"
-        class="strength-btn"
-        type="button"
-        @click="showStrengthModal = true"
-      >
-        被动特长
-        <div class="strength-tooltip">
-
-          <div v-for="st in strengthInfo" :key="st.id" class="strength-item">
-            <strong>{{ st.name }}</strong>
-            <p>{{ st.des || "暂无描述" }}</p>
-          </div>
-          <div style="font-size: 0.9em;color: aliceblue">点击按钮查看详情</div>
-        </div>
-      </button>
-      <span v-else class="strength-empty">无被动特长</span>
-    </div>
   </article>
   <div v-if="showStrengthModal" class="modal">
     <div class="modal-card">
@@ -392,15 +392,15 @@ const formatCondition = (condition) => {
 
 <style scoped>
 .unit-card {
-  padding: 22px;
-  border-radius: 26px;
+  padding: clamp(0.75rem, 1.2vw, 1.1rem);
+  border-radius: clamp(1rem, 1.4vw, 1.625rem);
   background: rgba(14, 16, 24, 0.82);
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 22px 40px rgba(7, 10, 20, 0.45);
   backdrop-filter: blur(10px);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: clamp(0.4rem, 0.8vw, 0.625rem);
   position: relative;
   transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.2s ease;
 }
@@ -413,7 +413,7 @@ const formatCondition = (condition) => {
   border-color: rgba(110, 205, 255, 0.75);
   box-shadow: 0 0 0 1px rgba(110, 205, 255, 0.4),
     0 20px 40px rgba(56, 120, 255, 0.25);
-  transform: translateY(-2px);
+  transform: translateY(-0.125rem);
 }
 
 .floating-layer {
@@ -426,14 +426,14 @@ const formatCondition = (condition) => {
 .floating-text {
   position: absolute;
   left: 50%;
-  top: 10px;
+  top: 0.9rem;
   transform: translate(-50%, 0);
-  padding: 4px 12px;
+  padding: 0.25rem 0.75rem;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.28);
   background: rgba(8, 10, 18, 0.85);
   color: rgba(250, 253, 255, 0.95);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.02em;
   opacity: 0;
@@ -477,34 +477,39 @@ const formatCondition = (condition) => {
 }
 
 .label {
-  font-size: 12px;
+  font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.12em;
   color: rgba(255, 255, 255, 0.5);
   margin: 0;
 }
 
-h2 {
-  margin: 4px 0 0;
-  font-size: 28px;
-  letter-spacing: 0.01em;
+.unit-card > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.625rem;
 }
 
-.sub {
-  margin: 4px 0 0;
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.65);
+.title-block {
+  min-width: 0;
+}
+
+h2 {
+  margin: 0.15rem 0 0;
+  font-size: clamp(1.2rem, 1.7vw, 1.55rem);
+  letter-spacing: 0.01em;
 }
 
 .hp-row {
   display: flex;
   justify-content: space-between;
-  font-size: 13px;
+  font-size: clamp(0.75rem, 1vw, 0.8125rem);
   color: rgba(255, 255, 255, 0.7);
 }
 
 .hp-track {
-  height: 12px;
+  height: clamp(0.625rem, 1vw, 0.75rem);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.12);
   overflow: hidden;
@@ -524,12 +529,12 @@ h2 {
 .status-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: clamp(0.375rem, 0.8vw, 0.5rem);
 }
 
 .status-chip {
-  font-size: 11px;
-  padding: 4px 8px;
+  font-size: 0.6875rem;
+  padding: 0.25rem 0.5rem;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
   color: rgba(255, 255, 255, 0.75);
@@ -570,7 +575,7 @@ h2 {
   margin: 0;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px 16px;
+  gap: clamp(0.375rem, 0.8vw, 0.5rem) clamp(0.625rem, 1.2vw, 1rem);
 }
 
 .stats li {
@@ -578,25 +583,25 @@ h2 {
 }
 
 .stats span {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: rgba(255, 255, 255, 0.55);
 }
 
 .stats strong {
-  font-size: 16px;
+  font-size: clamp(0.9375rem, 1.1vw, 1rem);
   color: #f7f6ff;
 }
 
 .info-btn {
-  margin-left: 6px;
-  width: 18px;
-  height: 18px;
+  margin-left: 0.375rem;
+  width: 1.125rem;
+  height: 1.125rem;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.3);
   background: transparent;
   color: rgba(255, 255, 255, 0.7);
-  font-size: 11px;
-  line-height: 16px;
+  font-size: 0.6875rem;
+  line-height: 1rem;
   padding: 0;
   cursor: pointer;
 }
@@ -605,13 +610,13 @@ h2 {
   position: absolute;
   left: 0;
   top: 100%;
-  transform: translateY(8px);
+  transform: translateY(0.5rem);
   background: rgba(12, 16, 26, 0.95);
   border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 12px;
-  padding: 10px 12px;
-  min-width: 220px;
-  font-size: 12px;
+  border-radius: 0.75rem;
+  padding: 0.625rem 0.75rem;
+  width: min(18rem, 82vw);
+  font-size: 0.75rem;
   color: rgba(255, 255, 255, 0.9);
   opacity: 0;
   pointer-events: none;
@@ -622,11 +627,7 @@ h2 {
 .info-btn:hover + .info-tooltip,
 .info-btn:focus + .info-tooltip {
   opacity: 1;
-  transform: translateY(4px);
-}
-
-.strengths {
-  margin-top: 6px;
+  transform: translateY(0.25rem);
 }
 
 .strength-btn {
@@ -635,21 +636,31 @@ h2 {
   border: 1px solid rgba(255, 255, 255, 0.2);
   background: transparent;
   color: inherit;
-  padding: 6px 12px;
-  font-size: 12px;
+  padding: 0.3rem 0.65rem;
+  font-size: 0.75rem;
   cursor: pointer;
+}
+
+.strength-btn--header {
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+
+.strength-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .strength-tooltip {
   position: absolute;
-  left: 0;
-  top: -8px;
-  transform: translateY(-100%);
+  right: 0;
+  top: calc(100% + 0.2rem);
+  transform: translateY(0.4rem);
   background: rgba(12, 16, 26, 0.95);
   border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 12px;
-  padding: 10px 12px;
-  min-width: 220px;
+  border-radius: 0.75rem;
+  padding: 0.625rem 0.75rem;
+  width: min(17rem, 78vw);
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s ease, transform 0.2s ease;
@@ -658,22 +669,28 @@ h2 {
 
 .strength-btn:hover .strength-tooltip {
   opacity: 1;
-  transform: translateY(-110%);
+  transform: translateY(0);
 }
 
 .strength-item + .strength-item {
-  margin-top: 8px;
+  margin-top: 0.5rem;
 }
 
 .strength-item p {
-  margin: 4px 0 0;
-  font-size: 12px;
+  margin: 0.25rem 0 0;
+  font-size: 0.75rem;
   color: rgba(255, 255, 255, 0.7);
 }
 
 .strength-empty {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: rgba(255, 255, 255, 0.55);
+}
+
+.strength-hint {
+  margin-top: 0.25rem;
+  font-size: 0.7rem;
+  color: rgba(240, 248, 255, 0.9);
 }
 
 .modal {
@@ -694,11 +711,11 @@ h2 {
 .modal-card {
   position: relative;
   z-index: 21;
-  width: min(640px, 90vw);
+  width: min(40rem, 90vw);
   background: rgba(12, 16, 26, 0.98);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 20px;
-  padding: 20px;
+  border-radius: clamp(1rem, 1.2vw, 1.25rem);
+  padding: clamp(0.875rem, 1.3vw, 1.25rem);
   box-shadow: 0 30px 70px rgba(4, 6, 12, 0.6);
 }
 
@@ -706,36 +723,36 @@ h2 {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
+  gap: clamp(0.5rem, 1vw, 0.75rem);
 }
 
 .modal-card h4 {
   margin: 0;
-  font-size: 20px;
+  font-size: clamp(1rem, 1.4vw, 1.25rem);
 }
 
 .modal-body {
   overflow-y: scroll;
   max-height: 80vh;
-  margin-top: 12px;
+  margin-top: 0.75rem;
   display: grid;
-  gap: 12px;
+  gap: clamp(0.5rem, 1vw, 0.75rem);
 }
 
 .modal-item {
-  padding: 12px;
-  border-radius: 14px;
+  padding: 0.75rem;
+  border-radius: 0.875rem;
   background: rgba(255, 255, 255, 0.03);
 }
 
 .modal-item h5 {
-  margin: 0 0 6px;
-  font-size: 16px;
+  margin: 0 0 0.375rem;
+  font-size: clamp(0.9375rem, 1.1vw, 1rem);
 }
 
 .modal-item p {
-  margin: 4px 0;
-  font-size: 13px;
+  margin: 0.25rem 0;
+  font-size: clamp(0.75rem, 1vw, 0.8125rem);
   color: rgba(255, 255, 255, 0.75);
 }
 
@@ -744,6 +761,6 @@ h2 {
 }
 
 .close {
-  padding: 6px 12px;
+  padding: 0.375rem 0.75rem;
 }
 </style>

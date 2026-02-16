@@ -792,8 +792,8 @@ const removeListItem = (list, index) => {
       Web 端仅展示静态数据，自定义功能已禁用。
     </p>
 
-    <el-dialog v-model="selectVisible" :title="`${activeLabel}${selectMode === 'edit' ? '编辑' : '删除'}`" width="600px">
-      <el-form label-width="80px">
+    <el-dialog v-model="selectVisible" :title="`${activeLabel}${selectMode === 'edit' ? '编辑' : '删除'}`" width="min(37.5rem, 92vw)">
+      <el-form label-width="5rem">
         <el-form-item label="选择数据">
           <el-select v-model="selectedId" placeholder="请选择" :key="selectKey" class="select-field">
             <el-option
@@ -824,8 +824,8 @@ const removeListItem = (list, index) => {
       </template>
     </el-dialog>
 
-    <el-dialog v-model="dialogVisible" :title="`${activeLabel}${dialogMode === 'add' ? '新增' : '编辑'}`" width="1024px">
-      <el-form :model="formModel" label-width="110px" class="form-body">
+    <el-dialog v-model="dialogVisible" :title="`${activeLabel}${dialogMode === 'add' ? '新增' : '编辑'}`" width="min(64rem, 96vw)">
+      <el-form :model="formModel" label-width="6.875rem" class="form-body">
         <template v-if="dialogType === 'units'">
           <el-divider>基础信息</el-divider>
           <div class="form-grid">
@@ -1282,7 +1282,7 @@ const removeListItem = (list, index) => {
       </template>
     </el-dialog>
 
-    <el-dialog v-model="skillPreviewVisible" title="技能详情" width="760px">
+    <el-dialog v-model="skillPreviewVisible" title="技能详情" width="min(47.5rem, 95vw)">
       <div class="details">
         <div v-if="!customData.skills.length" class="empty-hint">暂无技能数据</div>
         <div v-else class="preview-list">
@@ -1299,7 +1299,7 @@ const removeListItem = (list, index) => {
       </div>
     </el-dialog>
 
-    <el-dialog v-model="strengthPreviewVisible" title="被动详情" width="760px">
+    <el-dialog v-model="strengthPreviewVisible" title="被动详情" width="min(47.5rem, 95vw)">
       <div class="details">
         <div v-if="!customData.strengths.length" class="empty-hint">暂无被动数据</div>
         <div v-else class="preview-list">
@@ -1316,12 +1316,12 @@ const removeListItem = (list, index) => {
       </div>
     </el-dialog>
 
-    <el-dialog v-model="blessingPreviewVisible" title="祝福详情" width="960px">
+    <el-dialog v-model="blessingPreviewVisible" title="祝福详情" width="min(60rem, 96vw)">
       <div class="details">
         <div class="preview-toolbar">
           <el-select
             v-model="blessingPreviewSortBy"
-            style="width: 150px"
+            style="width: clamp(7rem, 18vw, 9.375rem)"
             @change="resetBlessingPreviewPage"
           >
             <el-option label="按ID排序" value="id" />
@@ -1331,7 +1331,7 @@ const removeListItem = (list, index) => {
           </el-select>
           <el-select
             v-model="blessingPreviewSortOrder"
-            style="width: 120px"
+            style="width: clamp(6rem, 16vw, 7.5rem)"
             @change="resetBlessingPreviewPage"
           >
             <el-option label="升序" value="asc" />
@@ -1339,7 +1339,7 @@ const removeListItem = (list, index) => {
           </el-select>
           <el-select
             v-model="blessingPreviewQualityFilter"
-            style="width: 130px"
+            style="width: clamp(6.5rem, 17vw, 8.125rem)"
             @change="resetBlessingPreviewPage"
           >
             <el-option label="全部品质" value="all" />
@@ -1349,7 +1349,7 @@ const removeListItem = (list, index) => {
           </el-select>
           <el-select
             v-model="blessingPreviewRepeatableFilter"
-            style="width: 150px"
+            style="width: clamp(7rem, 18vw, 9.375rem)"
             @change="resetBlessingPreviewPage"
           >
             <el-option label="重复规则: 全部" value="all" />
@@ -1382,26 +1382,26 @@ const removeListItem = (list, index) => {
 
 <style scoped>
 .custom-module {
-  border-radius: 24px;
-  padding: 24px;
+  border-radius: clamp(1rem, 1.3vw, 1.5rem);
+  padding: clamp(0.875rem, 1.4vw, 1.5rem);
   background: rgba(9, 13, 22, 0.85);
   border: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: clamp(0.75rem, 1.1vw, 1rem);
 }
 
 .custom-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: clamp(0.75rem, 1.1vw, 1rem);
   flex-wrap: wrap;
 }
 
 .custom-head h3 {
-  margin: 0 0 6px;
-  font-size: 20px;
+  margin: 0 0 0.375rem;
+  font-size: clamp(1rem, 1.4vw, 1.25rem);
 }
 
 .custom-head p {
@@ -1410,9 +1410,9 @@ const removeListItem = (list, index) => {
 }
 
 .custom-badge {
-  padding: 6px 12px;
+  padding: 0.375rem 0.75rem;
   border-radius: 999px;
-  font-size: 12px;
+  font-size: 0.75rem;
   letter-spacing: 0.02em;
   background: rgba(74, 215, 191, 0.12);
   border: 1px solid rgba(74, 215, 191, 0.3);
@@ -1427,61 +1427,61 @@ const removeListItem = (list, index) => {
 
 .custom-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(clamp(12rem, 24vw, 14rem), 1fr));
+  gap: clamp(0.5rem, 0.9vw, 0.75rem);
 }
 
 .custom-card {
-  border-radius: 18px;
+  border-radius: clamp(0.875rem, 1vw, 1.125rem);
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.03);
-  padding: 16px;
+  padding: clamp(0.75rem, 1.1vw, 1rem);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: clamp(0.375rem, 0.8vw, 0.5rem);
 }
 
 .custom-card h4 {
   margin: 0;
-  font-size: 17px;
+  font-size: clamp(0.9375rem, 1.2vw, 1.0625rem);
 }
 
 .custom-card p {
   margin: 0;
-  font-size: 13px;
+  font-size: clamp(0.75rem, 1vw, 0.8125rem);
   color: rgba(255, 255, 255, 0.65);
 }
 
 .warn-text {
   margin: 0;
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.5;
   color: #ffd89a !important;
 }
 
 .form-warn {
-  padding: 8px 10px;
-  border-radius: 10px;
+  padding: 0.5rem 0.625rem;
+  border-radius: 0.625rem;
   border: 1px solid rgba(255, 210, 130, 0.35);
   background: rgba(255, 173, 83, 0.12);
 }
 
 .custom-actions {
   display: flex;
-  gap: 8px;
+  gap: clamp(0.375rem, 0.8vw, 0.5rem);
   flex-wrap: wrap;
 }
 
 .form-body {
   max-height: 70vh;
   overflow: auto;
-  padding-right: 6px;
+  padding-right: 0.375rem;
 }
 
 .form-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px 16px;
+  grid-template-columns: repeat(auto-fit, minmax(clamp(12rem, 24vw, 14rem), 1fr));
+  gap: clamp(0.625rem, 1vw, 0.75rem) clamp(0.75rem, 1.2vw, 1rem);
 }
 
 .form-full {
@@ -1490,37 +1490,37 @@ const removeListItem = (list, index) => {
 
 .list-toolbar {
   display: flex;
-  gap: 8px;
+  gap: clamp(0.375rem, 0.8vw, 0.5rem);
   flex-wrap: wrap;
 }
 
 .list-block {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: clamp(0.375rem, 0.8vw, 0.5rem);
 }
 
 .list-row {
   display: grid;
-  grid-template-columns: 140px 120px 120px 120px auto;
-  gap: 8px;
+  grid-template-columns: minmax(7.5rem, 1fr) repeat(3, minmax(6rem, 1fr)) auto;
+  gap: clamp(0.375rem, 0.8vw, 0.5rem);
   align-items: center;
 }
 
 .list-row--status {
-  grid-template-columns: minmax(160px, 1.4fr) repeat(3, minmax(120px, 1fr)) auto;
+  grid-template-columns: minmax(clamp(8rem, 18vw, 10rem), 1.4fr) repeat(3, minmax(clamp(6rem, 14vw, 7.5rem), 1fr)) auto;
   align-items: end;
 }
 
 .list-row--change {
-  grid-template-columns: minmax(140px, 1fr) minmax(180px, 1.2fr) repeat(2, minmax(120px, 1fr)) auto;
+  grid-template-columns: minmax(clamp(7.5rem, 16vw, 8.75rem), 1fr) minmax(clamp(9rem, 20vw, 11.25rem), 1.2fr) repeat(2, minmax(clamp(6rem, 14vw, 7.5rem), 1fr)) auto;
   align-items: end;
 }
 
 .list-cell {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 0.375rem;
 }
 
 .list-cell--action {
@@ -1528,13 +1528,13 @@ const removeListItem = (list, index) => {
 }
 
 .field-label {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: rgba(0, 0, 0, 0.6);
 }
 
 .list-hint {
   margin: 0;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: rgba(0, 0, 0, 0.6);
 }
 
@@ -1548,75 +1548,75 @@ const removeListItem = (list, index) => {
 
 .preview-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(clamp(12rem, 24vw, 14rem), 1fr));
+  gap: clamp(0.375rem, 0.8vw, 0.5rem);
 }
 
 .preview-card {
-  border-radius: 12px;
+  border-radius: 0.75rem;
   border: 1px solid rgba(0, 0, 0, 0.08);
-  padding: 10px 12px;
+  padding: 0.625rem 0.75rem;
   background: rgba(0, 0, 0, 0.03);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 0.375rem;
 }
 
 .preview-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: clamp(0.5rem, 1vw, 0.75rem);
   flex-wrap: wrap;
 }
 
 .preview-title {
-  font-size: 13px;
+  font-size: clamp(0.75rem, 1vw, 0.8125rem);
   font-weight: 600;
 }
 
 .preview-meta {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: rgba(0, 0, 0, 0.6);
 }
 
 .preview-desc {
   margin: 0;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: rgba(0, 0, 0, 0.72);
 }
 
 .empty-hint {
   margin: 0;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: rgba(0, 0, 0, 0.6);
 }
 
 .condition-block {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: clamp(0.5rem, 1vw, 0.75rem);
 }
 
 .condition-body {
-  border-radius: 12px;
+  border-radius: 0.75rem;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  padding: 12px;
+  padding: 0.75rem;
   background: rgba(255, 255, 255, 0.02);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: clamp(0.5rem, 1vw, 0.75rem);
 }
 
 .sub-block {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: clamp(0.375rem, 0.8vw, 0.5rem);
 }
 
 .hint {
   margin: 0;
-  font-size: 13px;
+  font-size: clamp(0.75rem, 1vw, 0.8125rem);
   color: rgba(255, 255, 255, 0.6);
 }
 
@@ -1632,8 +1632,8 @@ const removeListItem = (list, index) => {
 .preview-toolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 10px;
+  gap: clamp(0.375rem, 0.8vw, 0.5rem);
+  margin-bottom: 0.625rem;
 }
 
 .blessing-preview-table {
@@ -1641,7 +1641,7 @@ const removeListItem = (list, index) => {
 }
 
 .preview-pagination {
-  margin-top: 12px;
+  margin-top: 0.75rem;
   display: flex;
   justify-content: flex-end;
 }

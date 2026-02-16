@@ -129,14 +129,14 @@ const prevRound = () => {
 
 <style scoped>
 .log {
-  border-radius: 22px;
-  padding: 20px;
+  border-radius: clamp(1rem, 1.2vw, 1.375rem);
+  padding: clamp(0.875rem, 1.3vw, 1.25rem);
   background: rgba(12, 16, 26, 0.82);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  min-height: 280px;
+  min-height: clamp(14rem, 34vh, 17.5rem);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: clamp(0.5rem, 1vw, 0.75rem);
 }
 
 header {
@@ -147,21 +147,21 @@ header {
 
 h3 {
   margin: 0;
-  font-size: 18px;
+  font-size: clamp(0.9375rem, 1.1vw, 1rem);
 }
 
 .entries {
   display: flex;
   flex-direction: column-reverse;
-  gap: 10px;
+  gap: clamp(0.375rem, 0.8vw, 0.625rem);
   overflow-y: auto;
-  max-height: 200px;
-  padding-right: 4px;
+  max-height: min(36vh, 12.5rem);
+  padding-right: 0.25rem;
 }
 
 .entries p {
   margin: 0;
-  font-size: 13px;
+  font-size: clamp(0.7rem, 0.95vw, 0.78rem);
   line-height: 1.5;
   color: rgba(240, 238, 255, 0.88);
 }
@@ -175,11 +175,11 @@ h3 {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: clamp(0.5rem, 1vw, 0.75rem);
 }
 
 .round-label {
-  font-size: 12px;
+  font-size: 0.7rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.6);

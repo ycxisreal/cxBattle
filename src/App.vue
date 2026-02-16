@@ -1,5 +1,5 @@
 ﻿<script setup>
-import { computed, reactive, ref, watchEffect } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watchEffect } from "vue";
 import { ElMessage } from "element-plus";
 import { Refresh } from "@element-plus/icons-vue";
 import BattleLog from "./components/BattleLog.vue";
@@ -35,13 +35,15 @@ const {
 } = useBattle();
 
 const selectedUnitId = ref(null);
-const maxUnitDisplay = 6;
+const selectDisplayLimit = ref(6);
+const maxUnitDisplay = computed(() => selectDisplayLimit.value);
 const unitPage = ref(0);
 const showUnitModal = ref(false);
 const skillPage = ref(0);
 const selectedSkillIds = ref([]);
 const autoSkillIds = ref([]);
 const showSkillPool = ref(false);
+const skillCompactMode = ref(false);
 const sidebarTabs = [
   {
     id: "skill-formula",
@@ -91,20 +93,36 @@ const activePointRows = computed(() =>
   activePointUnitId.value ? getUnitPointRows(activePointUnitId.value) : []
 );
 
+// 中文注释：按窗口宽度动态控制选人页每页展示数量，宽屏 6 个，窄屏 3 个。
+const updateSelectDisplayLimit = () => {
+  if (typeof window === "undefined") return;
+  selectDisplayLimit.value = window.innerWidth <= 1600 ? 3 : 6;
+};
+
+onMounted(() => {
+  updateSelectDisplayLimit();
+  window.addEventListener("resize", updateSelectDisplayLimit);
+});
+
+onBeforeUnmount(() => {
+  if (typeof window === "undefined") return;
+  window.removeEventListener("resize", updateSelectDisplayLimit);
+});
+
 // 计算角色分页总数
 const totalUnitPages = computed(() =>
-  Math.max(1, Math.ceil(availableUnits.value.length / maxUnitDisplay))
+  Math.max(1, Math.ceil(availableUnits.value.length / maxUnitDisplay.value))
 );
 
 // 当前页展示的角色
 const pagedUnits = computed(() => {
-  const start = unitPage.value * maxUnitDisplay;
-  return availableUnits.value.slice(start, start + maxUnitDisplay);
+  const start = unitPage.value * maxUnitDisplay.value;
+  return availableUnits.value.slice(start, start + maxUnitDisplay.value);
 });
 
 // 是否需要分页控制
 const shouldShowUnitControls = computed(
-  () => availableUnits.value.length > maxUnitDisplay
+  () => availableUnits.value.length > maxUnitDisplay.value
 );
 
 // 当前页码（从 1 开始）
@@ -197,6 +215,11 @@ const startBattle = () => {
 
 const skipRound = () => {
   chooseSkill(null);
+};
+
+// 中文注释：切换出招栏缩略模式，仅显示技能名称以压缩模块高度。
+const toggleSkillCompactMode = () => {
+  skillCompactMode.value = !skillCompactMode.value;
 };
 
 const handleResetBattle = () => {
@@ -485,7 +508,7 @@ const midDraftQualityWeightsDisplay = computed(() => {
 
 <template>
   <div class="app">
-    <div v-if="state.phase === 'select'" class="select-layout">
+    <div v-if="state.phase === 'select'" class="select-layout select-layout--single-side">
       <aside class="select-side select-side-left">
         <header class="hero">
           <div>
@@ -494,12 +517,24 @@ const midDraftQualityWeightsDisplay = computed(() => {
             <p class="subtitle">
             </p>
           </div>
-          <div class="hero-actions">
-            <button class="primary" type="button" @click="toggleRandomize">
-              {{ state.randomize ? "关闭随机倍率影响" : "开启随机倍率影响" }}
+        </header>
+        <div class="select-point">
+          <h3>加点</h3>
+          <div class="point-panel">
+            <p class="point-panel-title">加点模块</p>
+            <p class="point-line">剩余点数：{{ globalPointSummary.remainingPoints }}</p>
+            <p class="point-line">已获得点数：{{ globalPointSummary.totalPoints }} / 300</p>
+            <p class="point-line">已使用点数：{{ globalPointSummary.usedPoints }}</p>
+            <ul class="point-overview-list">
+              <li v-for="item in pointOverviewList" :key="`point-overview-${item.unitId}`">
+                {{ item.unitName }}：{{ item.usedPoints }} 点
+              </li>
+            </ul>
+            <button class="ghost point-open-btn" type="button" @click="openPointModal">
+              开始加点
             </button>
           </div>
-        </header>
+        </div>
       </aside>
 
       <main class="select-main">
@@ -579,25 +614,7 @@ const midDraftQualityWeightsDisplay = computed(() => {
         </div>
       </main>
 
-      <aside class="select-side select-side-right">
-        <div class="select-point">
-          <h3>加点</h3>
-          <div class="point-panel">
-            <p class="point-panel-title">加点模块</p>
-            <p class="point-line">剩余点数：{{ globalPointSummary.remainingPoints }}</p>
-            <p class="point-line">已获得点数：{{ globalPointSummary.totalPoints }} / 300</p>
-            <p class="point-line">已使用点数：{{ globalPointSummary.usedPoints }}</p>
-            <ul class="point-overview-list">
-              <li v-for="item in pointOverviewList" :key="`point-overview-${item.unitId}`">
-                {{ item.unitName }}：{{ item.usedPoints }} 点
-              </li>
-            </ul>
-            <button class="ghost point-open-btn" type="button" @click="openPointModal">
-              开始加点
-            </button>
-          </div>
-        </div>
-      </aside>
+      <aside class="select-side select-side-right select-side-blank" aria-hidden="true"></aside>
 
     </div>
 
@@ -638,6 +655,15 @@ const midDraftQualityWeightsDisplay = computed(() => {
             <button class="ghost chain-open-btn" type="button" @click="toggleChainMode">
               {{ state.chainMode ? "关闭连战模式" : "开启连战模式" }}
             </button>
+            <div class="side-end-actions">
+              <button class="ghost side-end-btn reset-enemy-btn" type="button" @click="handleEndGameAndRestart">
+                <el-icon><Refresh /></el-icon>
+                <span>结束游戏并重新开始</span>
+              </button>
+              <button class="ghost side-end-btn reset-enemy-btn exit-game-btn" type="button" @click="handleEndGameAndExit">
+                结束游戏并退出
+              </button>
+            </div>
             <div v-if="state.chainMode">
               <div class="enemy-index-text">每击败 1 个敌人，下一名敌人额外获得：</div>
               <div class="enemy-index-text">- 生命/攻击/防御倍率：按 2%/4%/6%... 累加，单次增幅上限 +6%</div>
@@ -730,30 +756,42 @@ const midDraftQualityWeightsDisplay = computed(() => {
         </section>
 
         <section class="skills">
-          <header>
-            <h3>选择招式</h3>
-            <p>可从技能池中手动选择 4 个作为出招栏。</p>
-          </header>
-          <div class="skill-bar">
-            <div class="skill-list compact">
-              <SkillCard
-                v-for="skill in visibleSkills"
-                :key="skill.id"
-                :skill="skill"
-                :disabled="state.over || state.busy || state.draft.prePending || state.draft.midPending"
-                @click="chooseSkill(skill.id)"
-              />
+          <header class="skills-head">
+            <div class="skills-head-main">
+              <h3>选择招式</h3>
+              <p>可从技能池中手动选择 4 个作为出招栏。</p>
             </div>
-            <div class="slot-actions">
-              <button class="ghost" type="button" @click="toggleSkillPool">
-                {{ showSkillPool ? "收起技能池" : "手动选择招式" }}
+            <div class="skill-actions-inline">
+              <button class="ghost skill-action-btn compact-toggle-btn" type="button" @click="toggleSkillCompactMode">
+                <el-icon><Refresh /></el-icon>
+                <span>{{ skillCompactMode ? "退出缩略模式" : "开启缩略模式" }}</span>
+                <span class="skill-action-tip">
+                  使技能只展示名称，从而可以看到战斗日志。适用于战斗日志需要滚动才能看到的情况
+                </span>
               </button>
-              <button class="ghost" type="button" @click="clearSkillSlots">
-                清空手动出招栏
+              <button class="ghost skill-action-btn" type="button" @click="toggleSkillPool">
+                <el-icon><Refresh /></el-icon>
+                <span>{{ showSkillPool ? "收起技能池" : "手动选择招式" }}</span>
+              </button>
+              <button class="ghost skill-action-btn" type="button" @click="clearSkillSlots">
+                <el-icon><Refresh /></el-icon>
+                <span>清空手动出招栏</span>
               </button>
               <p class="page-indicator">
                 手动已选择 {{ selectedSkillIds.length }} / 4
               </p>
+            </div>
+          </header>
+          <div class="skill-bar">
+            <div class="skill-list compact" :class="{ 'compact-mode': skillCompactMode }">
+              <SkillCard
+                v-for="skill in visibleSkills"
+                :key="skill.id"
+                :skill="skill"
+                :compact="skillCompactMode"
+                :disabled="state.over || state.busy || state.draft.prePending || state.draft.midPending"
+                @click="chooseSkill(skill.id)"
+              />
             </div>
           </div>
           <div v-if="showSkillPool" class="skill-pool">
@@ -799,17 +837,7 @@ const midDraftQualityWeightsDisplay = computed(() => {
           <p v-if="state.over" class="hint">战斗结束，确认结算弹窗后可退出或重开。</p>
         </section>
 
-        <BattleLog :entries="state.log">
-          <template #actions>
-            <button class="ghost reset-enemy-btn" type="button" @click="handleEndGameAndRestart">
-              <el-icon><Refresh /></el-icon>
-              <span>结束游戏并重新开始</span>
-            </button>
-            <button class="ghost reset-enemy-btn exit-game-btn" type="button" @click="handleEndGameAndExit">
-              结束游戏并退出
-            </button>
-          </template>
-        </BattleLog>
+        <BattleLog :entries="state.log" />
       </div>
 
       <aside class="battle-side battle-side-right" aria-hidden="true">
@@ -1187,20 +1215,29 @@ const midDraftQualityWeightsDisplay = computed(() => {
 
 <style scoped>
 .app {
-  --center-column-width: 1180px;
+  --center-column-width: clamp(38rem, 62vw, 70rem);
+  --side-column-width: clamp(15rem, 24vw, 22rem);
+  --grid-gap: clamp(0.75rem, 1.1vw, 1.125rem);
+  --panel-radius: clamp(1rem, 1.3vw, 1.625rem);
+  --panel-padding: clamp(0.875rem, 1.4vw, 1.5rem);
   max-width: 100vw;
   margin: 0 auto;
-  padding: 36px 24px 48px;
+  padding: clamp(1rem, 2.4vw, 2.25rem) clamp(0.75rem, 2vw, 1.5rem)
+    clamp(1.25rem, 3vw, 3rem);
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: clamp(0.875rem, 1.8vw, 1.75rem);
 }
 
 .select-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, var(--center-column-width)) minmax(0, 1fr);
-  gap: 18px;
+  grid-template-columns: minmax(clamp(14rem, 18vw, 18rem), 1.05fr) minmax(0, 2.6fr) minmax(clamp(14rem, 18vw, 18rem), 1.05fr);
+  gap: var(--grid-gap);
   align-items: start;
+}
+
+.select-layout--single-side {
+  grid-template-columns: minmax(clamp(16rem, 22vw, 21rem), 1.1fr) minmax(0, 3fr) minmax(clamp(16rem, 22vw, 21rem), 1.1fr);
 }
 
 .select-main {
@@ -1208,7 +1245,7 @@ const midDraftQualityWeightsDisplay = computed(() => {
 }
 
 .select-bottom-center {
-  margin-top: 18px;
+  margin-top: clamp(0.75rem, 1.2vw, 1.125rem);
   width: 100%;
 }
 
@@ -1218,12 +1255,20 @@ const midDraftQualityWeightsDisplay = computed(() => {
 
 .select-side {
   min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--grid-gap);
+}
+
+.select-side-blank {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .select-side-left,
 .select-side-right {
   position: sticky;
-  top: 20px;
+  top: clamp(0.75rem, 1.6vw, 1.25rem);
 }
 
 .hero {
@@ -1231,44 +1276,44 @@ const midDraftQualityWeightsDisplay = computed(() => {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
-  padding: 24px;
-  border-radius: 28px;
+  gap: clamp(0.75rem, 1.3vw, 1.25rem);
+  padding: var(--panel-padding);
+  border-radius: var(--panel-radius);
   background: rgba(9, 12, 20, 0.75);
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 28px 60px rgba(8, 10, 18, 0.5);
 }
 
 .kicker {
-  font-size: 12px;
+  font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.18em;
   color: rgba(255, 255, 255, 0.6);
-  margin: 0 0 6px;
+  margin: 0 0 0.375rem;
 }
 
 h1 {
   margin: 0;
-  font-size: 36px;
+  font-size: clamp(1.75rem, 2.7vw, 2.25rem);
   letter-spacing: 0.02em;
 }
 
 .subtitle {
-  margin: 8px 0 0;
-  max-width: 540px;
-  font-size: 15px;
+  margin: 0.5rem 0 0;
+  max-width: min(100%, 34rem);
+  font-size: clamp(0.875rem, 1.1vw, 0.95rem);
   color: var(--text-muted);
 }
 
 .hero-actions {
   display: flex;
-  gap: 12px;
+  gap: clamp(0.5rem, 0.9vw, 0.75rem);
   flex-wrap: wrap;
 }
 
 .ghost,
 .primary {
-  padding: 5px 16px;
+  padding: 0.3125rem 1rem;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.2);
   background: transparent;
@@ -1291,48 +1336,54 @@ h1 {
 
 .battle-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, var(--center-column-width)) minmax(0, 1fr);
-  gap: 18px;
+  grid-template-columns: minmax(clamp(14rem, 18vw, 18rem), 1fr) minmax(0, 2.8fr) minmax(clamp(14rem, 18vw, 18rem), 1fr);
+  gap: var(--grid-gap);
   align-items: start;
 }
 
 .battle-main {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: var(--grid-gap);
   min-width: 0;
 }
 
 .battle-side {
   min-height: 100%;
+  min-width: clamp(14rem, 18vw, 18rem);
+}
+
+.select-side {
+  min-width: clamp(14rem, 18vw, 18rem);
 }
 
 .battle-side-left,
 .battle-side-right {
   position: sticky;
-  top: 20px;
+  top: clamp(0.75rem, 1.6vw, 1.25rem);
 }
 
 .arena {
   display: grid;
-  grid-template-columns: minmax(0, 3fr) minmax(240px, 2fr) minmax(0, 3fr);
-  gap: 16px;
+  grid-template-columns: minmax(0, 3fr) minmax(clamp(12rem, 18vw, 16rem), 2fr) minmax(0, 3fr);
+  gap: clamp(0.625rem, 1.1vw, 1rem);
+  align-items: start;
 }
 
 .battle-sidebar {
-  border-radius: 18px;
-  padding: 14px;
+  border-radius: clamp(0.875rem, 1.1vw, 1.125rem);
+  padding: clamp(0.625rem, 1vw, 0.875rem);
   background: rgba(10, 14, 22, 0.92);
   border: 1px solid rgba(255, 255, 255, 0.12);
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: clamp(0.5rem, 0.9vw, 0.875rem);
 }
 
 .side-placeholder {
   min-height: 100%;
-  border-radius: 18px;
-  padding: 18px 14px;
+  border-radius: clamp(0.875rem, 1.1vw, 1.125rem);
+  padding: clamp(0.875rem, 1.3vw, 1.125rem) clamp(0.625rem, 1vw, 0.875rem);
   background: rgba(10, 14, 22, 0.65);
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
@@ -1434,9 +1485,9 @@ h1 {
 }
 
 .blessing-scroll-list {
-  max-height: 480px;
+  max-height: min(56vh, 30rem);
   overflow-y: auto;
-  padding-right: 4px;
+  padding-right: 0.25rem;
 }
 
 .build-section-sub {
@@ -1495,6 +1546,22 @@ h1 {
   gap: 6px;
 }
 
+.side-end-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.side-end-btn {
+  width: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 0.625rem;
+  font-weight: 700;
+}
+
 .build-list-conditions {
   margin-top: 8px;
   margin-bottom: 10px;
@@ -1515,9 +1582,9 @@ h1 {
 }
 
 .side-log-list {
-  margin: 8px 0 0;
-  padding-left: 16px;
-  max-height: 220px;
+  margin: 0.5rem 0 0;
+  padding-left: 1rem;
+  max-height: min(34vh, 13.75rem);
   overflow: auto;
   display: grid;
   gap: 4px;
@@ -1561,12 +1628,12 @@ h1 {
 }
 
 .modal {
-  width: min(720px, 92vw);
-  border-radius: 20px;
+  width: min(45rem, 92vw);
+  border-radius: clamp(1rem, 1.2vw, 1.25rem);
   background: rgba(12, 16, 26, 0.98);
   border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow: 0 28px 60px rgba(6, 10, 18, 0.6);
-  padding: 18px 20px 20px;
+  padding: clamp(0.875rem, 1.3vw, 1.125rem) clamp(0.875rem, 1.4vw, 1.25rem) clamp(1rem, 1.5vw, 1.25rem);
 }
 
 .modal-header {
@@ -1592,25 +1659,25 @@ h1 {
 }
 
 .unit-modal {
-  width: min(960px, 96vw);
+  width: min(60rem, 96vw);
 }
 
 .blessing-modal {
-  width: min(860px, 96vw);
+  width: min(53.75rem, 96vw);
 }
 
 .blessing-modal-list {
-  max-height: min(64vh, 560px);
+  max-height: min(64vh, 35rem);
   overflow-y: auto;
-  padding-right: 4px;
+  padding-right: 0.25rem;
 }
 
 .point-modal {
-  width: min(900px, 96vw);
+  width: min(56.25rem, 96vw);
 }
 
 .game-over-modal {
-  width: min(620px, 92vw);
+  width: min(38.75rem, 92vw);
 }
 
 .point-unit-tabs {
@@ -1685,7 +1752,7 @@ h1 {
 }
 
 .point-add-btn {
-  min-width: 52px;
+  min-width: 3.25rem;
 }
 
 .point-row-actions {
@@ -1701,10 +1768,10 @@ h1 {
 }
 
 .unit-modal-grid {
-  margin-top: 12px;
+  margin-top: 0.75rem;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(clamp(12rem, 24vw, 14rem), 1fr));
+  gap: clamp(0.5rem, 0.9vw, 0.75rem);
 }
 
 .formula {
@@ -1733,8 +1800,8 @@ h1 {
 
 .difficulty-options {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(clamp(5.75rem, 16vw, 7.5rem), 1fr));
+  gap: clamp(0.375rem, 0.8vw, 0.5rem);
 }
 
 .difficulty-option {
@@ -1892,15 +1959,15 @@ h1 {
 
 .select {
   display: grid;
-  grid-template-columns: minmax(0, 3fr) minmax(320px, 2fr);
-  gap: 18px;
+  grid-template-columns: minmax(0, 3fr) minmax(var(--side-column-width), 2fr);
+  gap: var(--grid-gap);
 }
 
 .select-panel,
 .select-preview,
 .select-point {
-  border-radius: 24px;
-  padding: 24px;
+  border-radius: var(--panel-radius);
+  padding: var(--panel-padding);
   background: rgba(8, 12, 20, 0.85);
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
@@ -1933,10 +2000,10 @@ h1 {
 }
 
 .select-grid {
-  margin-top: 16px;
+  margin-top: clamp(0.75rem, 1.3vw, 1rem);
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(clamp(12rem, 24vw, 14rem), 1fr));
+  gap: clamp(0.5rem, 0.9vw, 0.75rem);
 }
 
 .select-card {
@@ -2031,13 +2098,13 @@ h1 {
 }
 
 .center-panel {
-  border-radius: 24px;
-  padding: 20px;
+  border-radius: var(--panel-radius);
+  padding: clamp(0.7rem, 1vw, 0.95rem);
   background: rgba(14, 18, 30, 0.85);
   border: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: clamp(0.45rem, 0.8vw, 0.65rem);
   justify-content: space-between;
 }
 
@@ -2049,7 +2116,7 @@ h1 {
 
 .round p {
   margin: 0;
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .result {
@@ -2059,7 +2126,7 @@ h1 {
 
 .tips {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .tips strong {
@@ -2069,11 +2136,11 @@ h1 {
 
 .tips p {
   margin: 4px 0 0;
-  font-size: 16px;
+  font-size: 15px;
 }
 
 .notice {
-  padding: 12px 14px;
+  padding: 10px 12px;
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.05);
   font-size: 13px;
@@ -2085,19 +2152,19 @@ h1 {
 }
 
 .skills {
-  border-radius: 26px;
-  padding: 24px;
+  border-radius: var(--panel-radius);
+  padding: var(--panel-padding);
   background: rgba(7, 10, 18, 0.9);
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 24px 55px rgba(7, 9, 16, 0.5);
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: clamp(0.625rem, 1vw, 0.875rem);
 }
 
 .draft-panel {
-  border-radius: 20px;
-  padding: 16px;
+  border-radius: clamp(0.875rem, 1.1vw, 1.25rem);
+  padding: clamp(0.75rem, 1.1vw, 1rem);
   background: rgba(10, 14, 24, 0.92);
   border: 1px solid rgba(255, 255, 255, 0.12);
   display: flex;
@@ -2110,7 +2177,7 @@ h1 {
 }
 
 .draft-modal {
-  width: min(980px, 96vw);
+  width: min(61.25rem, 96vw);
 }
 
 .draft-head h3 {
@@ -2126,8 +2193,8 @@ h1 {
 
 .draft-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(clamp(10rem, 22vw, 12rem), 1fr));
+  gap: clamp(0.5rem, 0.9vw, 0.625rem);
 }
 
 .draft-card {
@@ -2207,53 +2274,116 @@ h1 {
   border-color: rgba(122, 255, 196, 0.55);
 }
 
-.skills header {
+.skills-head {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 8px 16px;
 }
 
-.skills h3 {
-  margin: 0;
-  font-size: 20px;
+.skills-head-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
 }
 
-.skills header p {
+.skills h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.skills-head p {
   margin: 6px 0 0;
+  font-size: 12px;
   color: var(--text-muted);
 }
 
-.skill-bar {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 12px;
+.skill-actions-inline {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.skill-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.compact-toggle-btn {
+  position: relative;
+  animation: compactToggleBreath 1.8s ease-in-out infinite;
+}
+
+.compact-toggle-btn:hover {
+  opacity: 1 !important;
+  animation-play-state: paused;
+}
+
+.skill-action-tip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 0.4rem);
+  transform: translate(-50%, 0.3rem);
+  width: min(21rem, 80vw);
+  padding: 0.45rem 0.6rem;
+  border-radius: 0.625rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(12, 16, 26, 0.96);
+  color: rgba(245, 248, 255, 0.92);
+  font-size: 0.7rem;
+  line-height: 1.45;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 8;
+}
+
+.compact-toggle-btn:hover .skill-action-tip {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+@keyframes compactToggleBreath {
+  0% {
+    box-shadow: 0 0 0 0 rgba(126, 107, 255, 0.28);
+  }
+  50% {
+    box-shadow: 0 0 0 0.35rem rgba(126, 107, 255, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(126, 107, 255, 0.28);
+  }
+}
+
+.skill-bar {
+  display: block;
 }
 
 .skill-list.compact {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(clamp(9.5rem, 20vw, 13rem), 1fr));
+  gap: clamp(0.5rem, 0.9vw, 0.75rem);
 }
 
-.slot-actions {
+.skill-list.compact.compact-mode {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 .page-indicator {
   margin: 0;
-  font-size: 12px;
+  font-size: 11px;
   color: rgba(255, 255, 255, 0.55);
 }
 
 .skill-pool {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(clamp(8.5rem, 18vw, 10rem), 1fr));
+  gap: clamp(0.375rem, 0.8vw, 0.5rem);
 }
 
 .pool-item {
@@ -2292,9 +2422,9 @@ h1 {
   transform: translate(-50%, -8px);
   background: rgba(12, 16, 26, 0.95);
   border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 12px;
-  padding: 10px 12px;
-  min-width: 220px;
+  border-radius: 0.75rem;
+  padding: 0.625rem 0.75rem;
+  width: min(18rem, 80vw);
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s ease, transform 0.2s ease;
@@ -2318,7 +2448,7 @@ h1 {
 
 .hint {
   margin: 0;
-  font-size: 13px;
+  font-size: 12px;
   color: rgba(255, 255, 255, 0.6);
 }
 
@@ -2333,7 +2463,7 @@ h1 {
   align-items: center;
   gap: 8px;
   font-weight: 800;
-  font-size: 14px;
+  font-size: clamp(0.8125rem, 1vw, 0.875rem);
   color: #1c0f00;
   border: none;
   background: linear-gradient(135deg, #ffd26a, #ff8f4a);
@@ -2341,7 +2471,7 @@ h1 {
 }
 
 .reset-enemy-btn .el-icon {
-  font-size: 16px;
+  font-size: 1rem;
 }
 
 .reset-enemy-btn:hover {
@@ -2356,12 +2486,8 @@ h1 {
 }
 
 @media (max-width: 1360px) {
-  .select-layout {
-    grid-template-columns: minmax(0, var(--center-column-width)) minmax(320px, 1fr);
-  }
-
-  .select-side-left {
-    display: none;
+  .select-layout--single-side {
+    grid-template-columns: minmax(clamp(14rem, 24vw, 18rem), 1fr) minmax(0, 2.8fr) minmax(clamp(14rem, 24vw, 18rem), 1fr);
   }
 }
 
@@ -2377,6 +2503,11 @@ h1 {
   .select-side-left,
   .select-side-right {
     position: static;
+    min-width: 0;
+  }
+
+  .select-side-blank {
+    display: none;
   }
 
   .battle-layout {
@@ -2390,6 +2521,7 @@ h1 {
   .battle-side-left,
   .battle-side-right {
     position: static;
+    min-width: 0;
   }
 
   .battle-side-right {
@@ -2409,12 +2541,66 @@ h1 {
   }
 }
 
+@media (max-width: 1200px) {
+  .app {
+    --center-column-width: min(100%, 62rem);
+    --side-column-width: min(100%, 20rem);
+    --grid-gap: clamp(0.625rem, 1vw, 0.875rem);
+  }
+
+  .select-panel,
+  .select-preview,
+  .select-point,
+  .skills,
+  .center-panel,
+  .battle-sidebar,
+  .draft-panel {
+    padding: clamp(0.75rem, 1.1vw, 1rem);
+  }
+
+  .blessing-scroll-list {
+    max-height: min(48vh, 24rem);
+  }
+
+  .point-overview-list {
+    max-height: min(38vh, 18rem);
+  }
+}
+
 @media (max-width: 980px) {
   .skill-bar {
     grid-template-columns: 1fr;
   }
 
   .skill-list.compact {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .app {
+    --center-column-width: 100%;
+    --side-column-width: 100%;
+  }
+
+  h1 {
+    font-size: clamp(1.5rem, 6vw, 1.9rem);
+  }
+
+  .hero,
+  .modal {
+    width: min(100%, 96vw);
+  }
+
+  .select-grid,
+  .unit-modal-grid,
+  .draft-cards,
+  .skill-pool {
+    grid-template-columns: 1fr;
+  }
+
+  .difficulty-options,
+  .quality-weight-focus {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

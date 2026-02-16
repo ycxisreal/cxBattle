@@ -111,8 +111,8 @@ ipcMain.handle('demo:save-data', async (event, payload) => {
 // 创建主窗口
 function createWindow() {
   const win = new BrowserWindow({
-    width: 1100,
-    height: 720,
+    width: 1536,
+    height: 864,
     backgroundColor: '#0f1115',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
@@ -120,7 +120,7 @@ function createWindow() {
       nodeIntegration: false,
     },
   })
-  win.maximize()
+  // win.maximize()
   win.removeMenu()
   if (isDev) {
     win.loadURL('http://localhost:5173')

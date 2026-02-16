@@ -12,6 +12,11 @@
   font-family: "Space Grotesk", "Noto Sans SC", sans-serif;
 }
 
+html {
+  /* 全局字号随视口宽度小幅自适应，避免纯固定字号导致布局比例失衡 */
+  font-size: clamp(14px, 0.24vw + 13px, 18px);
+}
+
 *,
 *::before,
 *::after {
